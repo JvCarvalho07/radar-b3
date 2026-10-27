@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Radar B3</title>
-  <meta name="description" content="Triagem de ações da B3 com alertas.">
-  <meta name="theme-color" content="#0d0d10">
+  <meta name="description" content="Triagem de ações da B3 com análise explicada e alertas.">
+  <meta name="theme-color" content="#1a1a1d">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
@@ -13,63 +13,31 @@
   <link rel="apple-touch-icon" href="icones/icone-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-  <div class="fundo" aria-hidden="true"></div>
-
   <div class="app">
-    <aside class="lateral">
-      <a class="marca" href="#inicio"><span class="marca-icone"><i class="ti ti-radar-2"></i></span><span>Radar <b>B3</b></span></a>
-      <nav class="menu" id="menu">
-        <span class="menu-titulo">Mercado</span>
-        <a href="#inicio" data-aba="inicio"><i class="ti ti-layout-dashboard"></i>Visão geral</a>
-        <a href="#estrategias" data-aba="estrategias"><i class="ti ti-filter-star"></i>Estratégias</a>
-        <a href="#acao" data-aba="acao"><i class="ti ti-chart-candle"></i>Ações</a>
-        <span class="menu-titulo">Você</span>
-        <a href="#watchlist" data-aba="watchlist"><i class="ti ti-star"></i>Watchlist</a>
-        <a href="#alertas" data-aba="alertas"><i class="ti ti-bell"></i>Alertas</a>
-      </nav>
-      <div class="lateral-rodape" id="lateral-push"></div>
-    </aside>
+    <nav class="trilho" aria-label="Navegação">
+      <a class="marca" href="#inicio" aria-label="Radar B3, visão geral"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 22a11 11 0 0 1 22 0" /><path d="M10 22a6 6 0 0 1 12 0" /><circle cx="16" cy="22" r="2.2" /><path d="M16 22 24 13" /></svg></a>
+      <div class="trilho-itens" id="menu">
+        <a href="#inicio" data-aba="inicio" title="Visão geral"><i class="ti ti-layout-dashboard"></i><span>Início</span></a>
+        <a href="#estrategias" data-aba="estrategias" title="Estratégias"><i class="ti ti-filter"></i><span>Estratégias</span></a>
+        <a href="#acao" data-aba="acao" title="Ações"><i class="ti ti-chart-candle"></i><span>Ações</span></a>
+        <a href="#watchlist" data-aba="watchlist" title="Watchlist"><i class="ti ti-star"></i><span>Watchlist</span></a>
+        <a href="#alertas" data-aba="alertas" title="Alertas"><i class="ti ti-bell"></i><span>Alertas</span></a>
+      </div>
+      <button class="trilho-busca" type="button" id="abrir-busca-trilho" title="Buscar ação (Ctrl K)" aria-label="Buscar ação"><i class="ti ti-search"></i></button>
+    </nav>
 
-    <div class="principal">
-      <header class="barra">
-        <a class="marca marca-mobile" href="#inicio"><span class="marca-icone"><i class="ti ti-radar-2"></i></span></a>
-        <div class="barra-titulo">
-          <h1 id="titulo">Visão geral</h1>
-          <span class="atualizado" id="atualizado"><span class="ponto"></span>Carregando…</span>
-        </div>
-        <button class="busca-botao" id="abrir-busca" type="button" aria-label="Buscar ação">
-          <i class="ti ti-search"></i><span>Buscar ação…</span><kbd>Ctrl K</kbd>
-        </button>
-      </header>
-
-      <div class="fita" id="fita" aria-label="Cotações"></div>
-
-      <main id="conteudo" class="conteudo"></main>
-
-      <footer class="rodape">
-        Triagem pelos critérios definidos por você. Não é recomendação de compra ou venda.
-        Preços com cerca de 15 min de atraso · Fundamentus, Yahoo Finance, Banco Central.
-      </footer>
-    </div>
+    <main class="tela" id="conteudo"></main>
   </div>
-
-  <nav class="inferior" id="inferior">
-    <a href="#inicio" data-aba="inicio"><i class="ti ti-layout-dashboard"></i><span>Início</span></a>
-    <a href="#estrategias" data-aba="estrategias"><i class="ti ti-filter-star"></i><span>Estratégias</span></a>
-    <a href="#acao" data-aba="acao"><i class="ti ti-chart-candle"></i><span>Ações</span></a>
-    <a href="#watchlist" data-aba="watchlist"><i class="ti ti-star"></i><span>Watchlist</span></a>
-    <a href="#alertas" data-aba="alertas"><i class="ti ti-bell"></i><span>Alertas</span></a>
-  </nav>
 
   <div class="paleta" id="paleta" hidden>
     <div class="paleta-caixa" role="dialog" aria-label="Buscar ação">
       <div class="paleta-campo"><i class="ti ti-search"></i>
-        <input id="paleta-input" placeholder="Código da ação (ex.: PETR4)" autocomplete="off" spellcheck="false">
+        <input id="paleta-input" placeholder="Código ou nome da empresa" autocomplete="off" spellcheck="false" aria-label="Código ou nome da empresa">
         <kbd>Esc</kbd></div>
       <div class="paleta-lista" id="paleta-lista"></div>
     </div>

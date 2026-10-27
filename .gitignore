@@ -10,3 +10,6 @@ publico/
 __pycache__/
 .venv/
 .claude/
+
+# Verificações locais da taste-skill
+.taste-skill/

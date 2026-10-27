@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import alertas
+from . import alertas, analise, fontes
 from .screener import RAIZ
 
 PASTA_SITE = RAIZ / "site"
@@ -38,12 +38,23 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
     _json(dados / "resultado.json", resultado)
     _json(dados / "historico.json", alertas.ler_historico())
 
+    perfis = fontes.baixar_perfis(historicos)
+    contagem = {}
+    for est in resultado["estrategias"].values():
+        for p in est["papeis"]:
+            contagem[p["papel"]] = contagem.get(p["papel"], 0) + 1
+
     tabela = {}
     for papel, linha in universo.iterrows():
-        tabela[papel] = {c: _limpo(linha.get(c)) for c in CAMPOS_UNIVERSO if c in linha}
+        u = {c: _limpo(linha.get(c)) for c in CAMPOS_UNIVERSO if c in linha}
         if papel in historicos:
-            # Últimos ~3 meses de fechamento para os mini gráficos dos cards.
-            tabela[papel]["spark"] = [round(float(x), 2) for x in historicos[papel]["Close"].iloc[-63:]]
+            # Últimos ~3 meses de fechamento para os mini gráficos.
+            u["spark"] = [round(float(x), 2) for x in historicos[papel]["Close"].iloc[-63:]]
+            u.update(analise.faixas(historicos[papel]))
+            u.update({k: _limpo(v) for k, v in perfis.get(papel, {}).items()})
+            u.update(analise.preco_justo(u.get("cotacao"), u.get("pl"), u.get("pvp"), u.get("dy")))
+            u["a_favor"], u["atencao"] = analise.sinais(u, contagem.get(papel, 0))
+        tabela[papel] = u
     _json(dados / "universo.json", tabela)
 
     for papel, hist in historicos.items():

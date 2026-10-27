@@ -146,6 +146,32 @@ def baixar_historico(papeis) -> dict[str, pd.DataFrame]:
     return {p: cache[p] for p in papeis if p in cache}
 
 
+CAMPOS_PERFIL = {"longName": "nome", "sector": "setor", "targetLowPrice": "alvo_min", "targetMeanPrice": "alvo_medio",
+                 "targetHighPrice": "alvo_max", "numberOfAnalystOpinions": "analistas", "recommendationKey": "recomendacao"}
+
+
+def baixar_perfis(papeis) -> dict[str, dict]:
+    """Nome, setor e alvo de preço dos analistas (Yahoo Finance), com cache de 1 dia."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    arq = _cache("perfis")
+    cache = _ler_cache(arq) or {}
+    faltando = sorted(set(papeis) - set(cache))
+
+    def um(papel):
+        try:
+            info = yf.Ticker(f"{papel}.SA").info
+            return papel, {novo: info.get(velho) for velho, novo in CAMPOS_PERFIL.items()}
+        except Exception as erro:  # sem cobertura, limite de acesso etc.
+            log.info("Sem perfil para %s: %s", papel, erro)
+            return papel, {}
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        cache.update(dict(pool.map(um, faltando)))
+    arq.write_bytes(pickle.dumps(cache))
+    return {p: cache.get(p, {}) for p in papeis}
+
+
 def metricas_de_preco(hist: pd.DataFrame) -> dict:
     """Queda desde a máxima de 52 semanas e variações recentes, em %."""
     fech = hist["Close"]
