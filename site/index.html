@@ -4,34 +4,76 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Radar B3</title>
-  <meta name="theme-color" content="#0b0f14">
+  <meta name="description" content="Triagem de ações da B3 com alertas.">
+  <meta name="theme-color" content="#0d0d10">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icones/icone-192.png">
   <link rel="apple-touch-icon" href="icones/icone-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-  <header class="topo">
-    <h1>📡 Radar B3</h1>
-    <span id="atualizado" class="sutil"></span>
-  </header>
+  <div class="fundo" aria-hidden="true"></div>
 
-  <nav class="abas" id="abas">
-    <a href="#inicio" data-aba="inicio">Início</a>
-    <a href="#estrategias" data-aba="estrategias">Estratégias</a>
-    <a href="#acao" data-aba="acao">Ação</a>
-    <a href="#watchlist" data-aba="watchlist">Watchlist</a>
-    <a href="#alertas" data-aba="alertas">Alertas</a>
+  <div class="app">
+    <aside class="lateral">
+      <a class="marca" href="#inicio"><span class="marca-icone"><i class="ti ti-radar-2"></i></span><span>Radar <b>B3</b></span></a>
+      <nav class="menu" id="menu">
+        <span class="menu-titulo">Mercado</span>
+        <a href="#inicio" data-aba="inicio"><i class="ti ti-layout-dashboard"></i>Visão geral</a>
+        <a href="#estrategias" data-aba="estrategias"><i class="ti ti-filter-star"></i>Estratégias</a>
+        <a href="#acao" data-aba="acao"><i class="ti ti-chart-candle"></i>Ações</a>
+        <span class="menu-titulo">Você</span>
+        <a href="#watchlist" data-aba="watchlist"><i class="ti ti-star"></i>Watchlist</a>
+        <a href="#alertas" data-aba="alertas"><i class="ti ti-bell"></i>Alertas</a>
+      </nav>
+      <div class="lateral-rodape" id="lateral-push"></div>
+    </aside>
+
+    <div class="principal">
+      <header class="barra">
+        <a class="marca marca-mobile" href="#inicio"><span class="marca-icone"><i class="ti ti-radar-2"></i></span></a>
+        <div class="barra-titulo">
+          <h1 id="titulo">Visão geral</h1>
+          <span class="atualizado" id="atualizado"><span class="ponto"></span>Carregando…</span>
+        </div>
+        <button class="busca-botao" id="abrir-busca" type="button" aria-label="Buscar ação">
+          <i class="ti ti-search"></i><span>Buscar ação…</span><kbd>Ctrl K</kbd>
+        </button>
+      </header>
+
+      <div class="fita" id="fita" aria-label="Cotações"></div>
+
+      <main id="conteudo" class="conteudo"></main>
+
+      <footer class="rodape">
+        Triagem pelos critérios definidos por você. Não é recomendação de compra ou venda.
+        Preços com cerca de 15 min de atraso · Fundamentus, Yahoo Finance, Banco Central.
+      </footer>
+    </div>
+  </div>
+
+  <nav class="inferior" id="inferior">
+    <a href="#inicio" data-aba="inicio"><i class="ti ti-layout-dashboard"></i><span>Início</span></a>
+    <a href="#estrategias" data-aba="estrategias"><i class="ti ti-filter-star"></i><span>Estratégias</span></a>
+    <a href="#acao" data-aba="acao"><i class="ti ti-chart-candle"></i><span>Ações</span></a>
+    <a href="#watchlist" data-aba="watchlist"><i class="ti ti-star"></i><span>Watchlist</span></a>
+    <a href="#alertas" data-aba="alertas"><i class="ti ti-bell"></i><span>Alertas</span></a>
   </nav>
 
-  <main id="conteudo"><p class="sutil">Carregando…</p></main>
-
-  <footer class="rodape">
-    Triagem pelos critérios definidos por você. Não é recomendação de compra ou venda.
-    Preços com cerca de 15 min de atraso; fontes: Fundamentus, Yahoo Finance e AwesomeAPI.
-  </footer>
+  <div class="paleta" id="paleta" hidden>
+    <div class="paleta-caixa" role="dialog" aria-label="Buscar ação">
+      <div class="paleta-campo"><i class="ti ti-search"></i>
+        <input id="paleta-input" placeholder="Código da ação (ex.: PETR4)" autocomplete="off" spellcheck="false">
+        <kbd>Esc</kbd></div>
+      <div class="paleta-lista" id="paleta-lista"></div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
   <script src="config.js"></script>

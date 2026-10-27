@@ -172,11 +172,13 @@ def resumo_mercado() -> dict:
     """Ibovespa (Yahoo) e dólar comercial (AwesomeAPI): valor e variação do dia."""
     resultado = {}
     try:
-        fech = yf.Ticker("^BVSP").history(period="10d")["Close"].dropna()
+        fech = yf.Ticker("^BVSP").history(period="1y")["Close"].dropna()
         resultado["ibovespa"] = {
             "valor": float(fech.iloc[-1]),
             "var_dia": (float(fech.iloc[-1]) / float(fech.iloc[-2]) - 1) * 100,
             "data": fech.index[-1].strftime("%Y-%m-%d"),
+            # Série diária de 1 ano para o gráfico principal do app.
+            "serie": [[d.strftime("%Y-%m-%d"), round(float(v))] for d, v in fech.items()],
         }
     except Exception as erro:
         log.warning("Falha ao obter Ibovespa: %s", erro)

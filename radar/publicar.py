@@ -41,6 +41,9 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
     tabela = {}
     for papel, linha in universo.iterrows():
         tabela[papel] = {c: _limpo(linha.get(c)) for c in CAMPOS_UNIVERSO if c in linha}
+        if papel in historicos:
+            # Últimos ~3 meses de fechamento para os mini gráficos dos cards.
+            tabela[papel]["spark"] = [round(float(x), 2) for x in historicos[papel]["Close"].iloc[-63:]]
     _json(dados / "universo.json", tabela)
 
     for papel, hist in historicos.items():
