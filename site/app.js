@@ -66,7 +66,7 @@ function telaInicio() {
     ${avisoPush()}
     <div class="cartoes">
       ${m.ibovespa ? cartao("Ibovespa", num(m.ibovespa.valor, 0), m.ibovespa.var_dia) : ""}
-      ${m.dolar ? cartao("Dólar", `R$ ${num(m.dolar.valor, 3)}`, m.dolar.var_dia) : ""}
+      ${m.dolar ? cartao(m.dolar.fonte === "PTAX/BC" ? "Dólar (PTAX)" : "Dólar", `R$ ${num(m.dolar.valor, 3)}`, m.dolar.var_dia) : ""}
       ${Object.values(r.estrategias).map((e) => cartao(e.nome, e.papeis.length)).join("")}
     </div>
     <h2>Último alerta</h2>

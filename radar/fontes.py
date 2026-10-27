@@ -184,7 +184,30 @@ def resumo_mercado() -> dict:
         d = requests.get(URL_DOLAR, headers=HEADERS, timeout=20).json()["USDBRL"]
         resultado["dolar"] = {
             "valor": float(d["bid"]), "var_dia": float(d["pctChange"]), "data": d["create_date"],
+            "fonte": "AwesomeAPI",
         }
     except Exception as erro:
-        log.warning("Falha ao obter dólar: %s", erro)
+        # A AwesomeAPI costuma recusar acessos vindos de servidores (ex.: GitHub Actions).
+        log.warning("AwesomeAPI indisponível (%s); usando PTAX do Banco Central.", erro)
+        try:
+            resultado["dolar"] = _dolar_ptax()
+        except Exception as erro_bc:
+            log.warning("Falha ao obter dólar: %s", erro_bc)
     return resultado
+
+
+def _dolar_ptax() -> dict:
+    """Última PTAX (oficial do Banco Central) e variação contra o dia útil anterior."""
+    fim = date.today()
+    inicio = fim - pd.Timedelta(days=10)
+    url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+           "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+           f"?@dataInicial='{inicio:%m-%d-%Y}'&@dataFinalCotacao='{fim:%m-%d-%Y}'&$format=json")
+    cotacoes = requests.get(url, headers=HEADERS, timeout=20).json()["value"]
+    atual, anterior = cotacoes[-1], cotacoes[-2]
+    return {
+        "valor": float(atual["cotacaoVenda"]),
+        "var_dia": (float(atual["cotacaoVenda"]) / float(anterior["cotacaoVenda"]) - 1) * 100,
+        "data": atual["dataHoraCotacao"][:16],
+        "fonte": "PTAX/BC",
+    }
