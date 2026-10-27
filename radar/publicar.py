@@ -54,10 +54,11 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
             u.update({k: _limpo(v) for k, v in perfis.get(papel, {}).items()})
             u.update(analise.preco_justo(u.get("cotacao"), u.get("pl"), u.get("pvp"), u.get("dy")))
             u["a_favor"], u["atencao"] = analise.sinais(u, contagem.get(papel, 0))
+            u["pontos"] = analise.pontuacao(u["a_favor"], u["atencao"])
         tabela[papel] = u
     _json(dados / "universo.json", tabela)
 
     for papel, hist in historicos.items():
-        velas = [[d.strftime("%Y-%m-%d"), *(round(float(x), 2) for x in row)]
-                 for d, row in zip(hist.index, hist[["Open", "High", "Low", "Close"]].values)]
+        velas = [[d.strftime("%Y-%m-%d"), *(round(float(x), 2) for x in row[:4]), int(row[4] or 0)]
+                 for d, row in zip(hist.index, hist[["Open", "High", "Low", "Close", "Volume"]].fillna(0).values)]
         _json(dados / "precos" / f"{papel}.json", velas)

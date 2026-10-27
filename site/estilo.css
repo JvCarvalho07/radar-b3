@@ -269,3 +269,42 @@ ol.lista-passos a { color: var(--ambar); text-decoration: underline; }
   .titulo .direita { justify-content: space-between; gap: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- Referências do usuário (Pinterest): campo de fogo, parede de nomes, pílulas ---------- */
+.fogo { position: relative; overflow: hidden; border: 0; color: #fff; background: radial-gradient(130% 110% at 75% -15%, #ff8a1f 0%, #e9461f 36%, #4a1a12 70%, #161214 100%); } /* taste-skill-ignore: campo de fogo pedido (ref. Discuss and Invest) */
+.fogo > * { position: relative; z-index: 1; }
+.fogo .faint, .fogo .muted { color: rgba(255, 255, 255, .78); }
+.fogo .pos { color: #8ff0c0; } .fogo .neg { color: #ffd0c8; }
+.parede { position: absolute !important; z-index: 0 !important; inset: -10px -20px auto; font: 800 clamp(54px, 8.4vw, 124px)/.84 var(--font); letter-spacing: -.045em; text-transform: uppercase; color: rgba(20, 4, 0, .17); word-break: break-all; pointer-events: none; user-select: none; }
+.preco-grande { font: 800 clamp(44px, 6vw, 72px)/1 var(--font); letter-spacing: -.04em; font-variant-numeric: tabular-nums; display: flex; align-items: flex-start; gap: 6px; }
+.preco-grande .moeda { font-size: .34em; font-weight: 700; margin-top: .35em; opacity: .85; }
+.preco-grande sup { font-size: .4em; font-weight: 700; margin-top: .12em; opacity: .9; letter-spacing: -.02em; }
+.pilulas { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0, 0, 0, .28); border: 1px solid rgba(255, 255, 255, .12); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.pilulas::-webkit-scrollbar { display: none; }
+.pilulas button { height: 30px; padding: 0 14px; border-radius: 999px; font: 600 12.5px var(--font); color: rgba(255, 255, 255, .78); white-space: nowrap; transition: background .15s, color .15s; }
+.pilulas button:hover { color: #fff; }
+.pilulas button.ativo { background: #fff; color: #141416; }
+.painel:not(.fogo) .pilulas { background: var(--ground); border-color: var(--border); }
+.painel:not(.fogo) .pilulas button { color: var(--muted); }
+.painel:not(.fogo) .pilulas button.ativo { background: var(--text); color: #141416; }
+.acoes-topo { display: flex; gap: 10px; flex-wrap: wrap; }
+.botao.branco { background: #fff; color: #141416; height: 42px; padding: 0 22px; font-size: 14px; }
+.botao.branco:hover { background: #ffe9d6; }
+.botao.vazado { border: 1px solid rgba(255, 255, 255, .55); color: #fff; height: 42px; padding: 0 22px; font-size: 14px; }
+.botao.vazado:hover { background: rgba(255, 255, 255, .1); }
+.fogo-topo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px 28px; }
+.fogo-topo .achado { max-width: 460px; margin-left: auto; font-size: 14px; line-height: 21px; color: rgba(255, 255, 255, .88); }
+.fogo-topo .achado b { color: #fff; }
+.fogo .grafico { margin-top: 18px; }
+/* Pontuação dos sinais (ref. Crypto App: risk score) */
+.pontuacao { padding: 14px 16px; border-radius: 8px; background: var(--ground); margin: 2px 0 14px; }
+.pontuacao .valor { font: 700 30px/34px var(--font); letter-spacing: -.02em; }
+.pontuacao .valor small { font-size: 14px; font-weight: 500; color: var(--faint); }
+.trilha-pont { height: 10px; border-radius: 5px; background: var(--raised); margin: 10px 0 6px; overflow: hidden; }
+.trilha-pont span { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #ff4a2b, #ff8a1f 50%, #ffb547); } /* taste-skill-ignore: escala de pontos */
+.extremos { display: flex; justify-content: space-between; font-size: 12px; color: var(--faint); }
+@media (max-width: 760px) {
+  .fogo-topo .achado { margin-left: 0; }
+  .parede { font-size: 58px; }
+  .botao.branco, .botao.vazado { flex: 1; justify-content: center; }
+}

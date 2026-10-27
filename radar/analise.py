@@ -86,3 +86,8 @@ def sinais(u: dict, n_estrategias: int) -> tuple[list[dict], list[dict]]:
     if n_estrategias:
         a_favor.append({"t": f"Passa em {n_estrategias} estratégia{'s' if n_estrategias > 1 else ''} sua{'s' if n_estrategias > 1 else ''}", "d": "Cumpre todos os critérios que você definiu no config.yaml."})
     return a_favor, atencao
+
+
+def pontuacao(a_favor: list, atencao: list) -> int:
+    """De 0 a 100: começa em 50, +10 por sinal a favor, −10 por sinal de atenção."""
+    return max(0, min(100, 50 + 10 * len(a_favor) - 10 * len(atencao)))

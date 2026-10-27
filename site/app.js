@@ -106,12 +106,33 @@ function grafico(el) {
   return g;
 }
 const area = (g) => g.addAreaSeries({ lineColor: "#ff8a1f", lineWidth: 2, topColor: "rgba(255,138,31,.16)", bottomColor: "rgba(255,138,31,0)", priceLineVisible: false, crosshairMarkerBackgroundColor: "#ffb547" });
-const abasPeriodo = (ativo) => `<div class="abas" role="tablist">${Object.keys(PERIODOS).map((p) => `<button type="button" data-periodo="${p}" class="${p === ativo ? "ativo" : ""}">${p}</button>`).join("")}</div>`;
+const abasPeriodo = (ativo) => `<div class="pilulas" role="tablist">${Object.keys(PERIODOS).map((p) => `<button type="button" data-periodo="${p}" class="${p === ativo ? "ativo" : ""}">${p}</button>`).join("")}</div>`;
 function ligarAbas(raiz, attr, fn) {
   $$(`[data-${attr}]`, raiz).forEach((b) => b.onclick = () => {
     $$(`[data-${attr}]`, raiz).forEach((x) => x.classList.toggle("ativo", x === b));
     fn(b.dataset[attr]);
   });
+}
+
+function precoGrande(v, moeda = "R$", casas = 2) {
+  if (v == null) return `<div class="preco-grande">—</div>`;
+  const [int, dec] = num(v, casas).split(",");
+  return `<div class="preco-grande">${moeda ? `<span class="moeda">${moeda}</span>` : ""}<span>${int}</span>${dec ? `<sup>,${dec}</sup>` : ""}</div>`;
+}
+const parede = (palavras) => `<div class="parede" aria-hidden="true">${esc(palavras.filter(Boolean).join(" "))}</div>`;
+
+// Linha colorida pela tendência (verde subindo, vermelha caindo, contra 5 pregões antes), como na ref. "Discuss and Invest".
+function linhaTendencia(g, pontos) {
+  const s = g.addLineSeries({ lineWidth: 2, priceLineVisible: false, crosshairMarkerBackgroundColor: "#fff" });
+  s.setData(pontos.map(([time, value], i) => ({ time, value, color: value >= pontos[Math.max(0, i - 5)][1] ? "#5fe0a4" : "#ff6b5e" })));
+  return s;
+}
+function volume(g, velas) {
+  if (!velas[0] || velas[0].length < 6) return null;
+  const s = g.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
+  g.priceScale("vol").applyOptions({ scaleMargins: { top: .82, bottom: 0 } });
+  s.setData(velas.map((v) => ({ time: v[0], value: v[5], color: v[4] >= v[1] ? "rgba(255,193,92,.5)" : "rgba(255,74,43,.5)" })));
+  return s;
 }
 
 // ---------- Visão geral ----------
@@ -125,10 +146,12 @@ function telaInicio() {
     ${cabecalho("Visão geral", `Ibovespa <b class="num">${num(ib?.valor, 0)}</b> pontos, <b class="${cls(ib?.var_dia)}">${sinal(ib?.var_dia)}</b> hoje.
       ${estado.historico.length ? `${n ? `<b>${n} mudança${n > 1 ? "s" : ""}</b> nas suas estratégias` : "Nenhuma mudança nas suas estratégias"} na última atualização com novidades (${quando(estado.historico[0].em)}).` : ""}`)}
     ${avisoPush()}
-    <section class="painel s8" id="p-ibov">
-      <div class="cabeca-grafico">
-        <div><div class="faint">Ibovespa</div><div class="figura">${num(ib?.valor, 0)}<small>pts</small></div><div class="delta" id="ibov-per"></div></div>
-        ${abasPeriodo("6M")}
+    <section class="painel s8 fogo coluna-flex" id="p-ibov">
+      ${parede(["IBOV", ...ests.flatMap(([, e]) => e.papeis.slice(0, 6).map((p) => p.papel))])}
+      <div class="fogo-topo">
+        <div><div class="faint">Ibovespa, em pontos</div>${precoGrande(ib?.valor, "", 0)}
+          <div class="delta" style="margin-top:8px"><span class="${cls(ib?.var_dia)}">${sinal(ib?.var_dia)}</span> <span class="faint">hoje</span> · <span id="ibov-per"></span></div></div>
+        <div style="margin-left:auto">${abasPeriodo("6M")}</div>
       </div>
       <div class="grafico" id="g-ibov"></div>
     </section>
@@ -170,10 +193,13 @@ function telaInicio() {
   ligarAbas(tela, "mov", mov);
 
   if (ib?.serie && window.LightweightCharts) {
-    const g = grafico($("#g-ibov")), s = area(g);
+    const g = grafico($("#g-ibov"));
+    g.applyOptions({ layout: { textColor: "rgba(255,255,255,.75)" }, grid: { horzLines: { color: "rgba(255,255,255,.08)" } } });
+    let s = null;
     const aplicar = (per) => {
       const d = ib.serie.slice(-PERIODOS[per]);
-      s.setData(d.map(([time, value]) => ({ time, value })));
+      if (s) g.removeSeries(s);
+      s = linhaTendencia(g, d);
       s.setMarkers(eventoMaior(d));
       g.timeScale().fitContent();
       const v = dif(d.at(-1)[1], d[0][1]);
@@ -192,7 +218,7 @@ function eventoMaior(d) {
   const [data, v] = mov.reduce((a, b) => (Math.abs(b[1]) > Math.abs(a[1]) ? b : a));
   if (Math.abs(v) < tipico * 3) return [];
   const [, mes, dia] = data.split("-");
-  return [{ time: data, position: v < 0 ? "aboveBar" : "belowBar", color: v < 0 ? "#e5566f" : "#44a282", shape: v < 0 ? "arrowDown" : "arrowUp", text: `${sinal(v, 1)} em ${dia}/${mes}` }];
+  return [{ time: data, position: v < 0 ? "aboveBar" : "belowBar", color: v < 0 ? "#e5566f" : "#44a282", shape: v < 0 ? "arrowDown" : "arrowUp", text: `${sinal(v, 1)}` }];
 }
 
 // ---------- Estratégias ----------
@@ -267,32 +293,37 @@ async function telaAcao(arg) {
   tela.innerHTML = `
     ${cabecalho(`<span style="display:inline-flex;align-items:center;gap:14px">${logo(papel, "g")}${esc(papel)}</span>`,
       `${esc(curto(u.nome) || "")}${u.setor ? ` · ${esc(SETORES[u.setor] || u.setor)}` : ""}${u.financeira ? " · banco ou seguradora" : ""}`)}
-    <section class="painel">
-      <div class="cabeca-grafico" style="align-items:flex-start">
-        <div><div class="figura">${reais(preco)}</div><div class="delta">${varCel(u.var_dia)} <span class="faint">hoje</span> · ${varCel(u.var_30d, 1)} <span class="faint">em 30 dias</span> · ${varCel(u.var_1a, 1)} <span class="faint">em 12 meses</span></div></div>
-        <p class="muted" style="max-width:520px;margin-left:auto;font-size:14px;line-height:21px">${achado.length ? `O preço de hoje está ${achado.join(" e ")}.` : "Sem lucro, dividendos ou cobertura de analistas suficientes para estimar um preço justo."}
-          ${u.faixa_1m ? ` Pela oscilação recente, em 2 de cada 3 meses o preço termina entre <b class="num" style="color:var(--text)">${reais(u.faixa_1m[0])}</b> e <b class="num" style="color:var(--text)">${reais(u.faixa_1m[1])}</b>.` : ""}</p>
+    <section class="painel s8 fogo coluna-flex" id="p-graf">
+      ${parede([papel, ...(curto(u.nome) || "").split(/\s+/).slice(0, 3), SETORES[u.setor] || "", papel])}
+      <div class="fogo-topo">
+        <div>${precoGrande(preco)}
+          <div class="delta" style="margin-top:8px">${varCel(u.var_dia)} <span class="faint">hoje</span> · ${varCel(u.var_30d, 1)} <span class="faint">30 dias</span> · ${varCel(u.var_1a, 1)} <span class="faint">12 meses</span></div></div>
+        <p class="achado">${achado.length ? `O preço de hoje está <b>${achado.join("</b> e <b>")}</b>.` : "Sem lucro, dividendos ou cobertura de analistas suficientes para estimar um preço justo."}
+          ${u.faixa_1m ? ` Pela oscilação recente, em 2 de cada 3 meses o preço termina entre <b class="num">${reais(u.faixa_1m[0])}</b> e <b class="num">${reais(u.faixa_1m[1])}</b>.` : ""}</p>
       </div>
-      <h2 style="font-size:16px;font-weight:600;margin-top:22px">Régua de preço</h2>
-      <p class="faint" style="margin-top:2px">Do mais barato (âmbar) ao mais caro (vermelho), dentro dos valores calculados para ${esc(papel)}.</p>
-      ${regua(u, preco)}
-      ${tabelaRegua(u, preco, temAnalistas)}
-    </section>
-
-    <section class="painel s8 coluna-flex" id="p-graf">
-      <div class="painel-cabeca"><h2>Cotação</h2>
-        <div class="abas" style="margin-left:auto"><button type="button" data-tipo="velas" class="ativo">Velas</button><button type="button" data-tipo="linha">Linha</button></div>
-        ${abasPeriodo("6M")}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">${abasPeriodo("6M")}
+        <div class="pilulas"><button type="button" data-tipo="linha" class="ativo">Linha</button><button type="button" data-tipo="velas">Velas</button></div></div>
       <div class="grafico alto" id="g-acao"><div class="carregando"></div></div>
-      <p class="faint">A linha tracejada é a média dos últimos 20 pregões.</p>
+      <div class="acoes-topo" style="margin-top:14px">
+        <button class="botao branco" type="button" data-rolar="comprar">Como comprar ${esc(papel)}</button>
+        <a class="botao vazado" href="https://github.com/${RADAR.repo}/edit/main/config.yaml" target="_blank" rel="noopener">${estado.resultado.watchlist.some((w) => w.papel === papel) ? "Está na watchlist · editar" : "Pôr na watchlist"}</a>
+      </div>
     </section>
     <section class="painel s4 leitura">
       <div class="painel-cabeca"><h2>Leitura do Radar</h2></div>
+      ${u.pontos != null ? `<div class="pontuacao"><div class="faint">Pontuação dos sinais</div><div class="valor">${u.pontos}<small> de 100</small></div>
+        <div class="trilha-pont"><span style="width:${u.pontos}%"></span></div><div class="extremos"><span>Mais pontos de atenção</span><span>Mais sinais a favor</span></div></div>` : ""}
       <div class="placar"><div><b class="pos">${u.a_favor?.length ?? 0}</b>a favor</div><div><b class="${u.atencao?.length ? "neg" : ""}">${u.atencao?.length ?? 0}</b>pedem atenção</div></div>
       ${(u.a_favor || []).map((s) => `<div class="sinal-item"><i class="ti ti-check pos"></i><div><b>${esc(s.t)}</b><p>${esc(s.d)}</p></div></div>`).join("")}
       ${(u.atencao || []).map((s) => `<div class="sinal-item"><i class="ti ti-alert-triangle neg"></i><div><b>${esc(s.t)}</b><p>${esc(s.d)}</p></div></div>`).join("")}
       ${!u.a_favor && !u.atencao ? '<div class="vazio">Sem dados de preço suficientes para a leitura.</div>' : ""}
       <p class="faint" style="margin-top:12px">Sinais calculados com regras fixas, explicadas ao lado. Não dizem o que fazer: ajudam a entender a ação.</p>
+    </section>
+
+    <section class="painel">
+      <div class="painel-cabeca"><h2>Régua de preço</h2><span class="extra">Do mais barato (âmbar) ao mais caro (vermelho), dentro dos valores calculados para ${esc(papel)}</span></div>
+      ${regua(u, preco)}
+      ${tabelaRegua(u, preco, temAnalistas)}
     </section>
 
     <section class="painel s4">
@@ -312,7 +343,7 @@ async function telaAcao(arg) {
       ${comoCalculado(u, preco, temAnalistas)}
     </section>
 
-    <section class="painel">
+    <section class="painel" id="comprar">
       <div class="painel-cabeca"><h2>Como comprar ${esc(papel)}</h2></div>
       <div class="passos">
         <div class="passo"><b>1. Abra conta numa corretora</b><p>Qualquer corretora autorizada pela CVM e participante da B3 serve. Muitas não cobram corretagem para ações; compare as taxas antes.</p></div>
@@ -399,7 +430,7 @@ function comoCalculado(u, preco, temA) {
     <p>σ é a oscilação diária dos últimos 6 meses (${num(u.vol_anual, 1)}% ao ano). É uma estimativa de quanto o preço costuma variar, não de para onde ele vai: em cerca de 2 de cada 3 meses, o preço termina dentro dela.</p></div>`);
   if (temA) itens.push(`<div class="conta-item"><b>Alvo dos analistas</b>
     <p>Média das projeções de ${u.analistas} analistas de bancos e corretoras para os próximos 12 meses, segundo o Yahoo Finance. Analistas também erram e revisam os alvos com frequência.</p></div>`);
-  itens.push(`<div class="conta-item"><b>Leitura do Radar</b><p>Conta sinais com regras fixas: preço abaixo de Graham (10% ou mais) ou de Bazin, ROE acima de 15%, dívida até 0,5× o patrimônio e alvo dos analistas 10% acima contam a favor. Prejuízo, ROE abaixo de 8%, dívida acima de 2×, queda de 15% no mês ou alvo abaixo do preço pedem atenção.</p></div>`);
+  itens.push(`<div class="conta-item"><b>Leitura do Radar</b><p>Conta sinais com regras fixas: preço abaixo de Graham (10% ou mais) ou de Bazin, ROE acima de 15%, dívida até 0,5× o patrimônio e alvo dos analistas 10% acima contam a favor. Prejuízo, ROE abaixo de 8%, dívida acima de 2×, queda de 15% no mês ou alvo abaixo do preço pedem atenção. A pontuação começa em 50, soma 10 por sinal a favor e tira 10 por sinal de atenção, de 0 a 100.</p></div>`);
   return itens.join("");
 }
 
@@ -411,19 +442,19 @@ async function desenharGraficoAcao(papel) {
   if (!velas || !window.LightweightCharts) { el.innerHTML = '<div class="vazio">Gráfico disponível para as ações das estratégias e da watchlist.</div>'; el.style.height = "auto"; return; }
   el.innerHTML = "";
   const g = grafico(el);
-  let tipo = "velas", periodo = "6M", serie, media;
+  g.applyOptions({ layout: { textColor: "rgba(255,255,255,.75)" }, grid: { horzLines: { color: "rgba(255,255,255,.08)" } } });
+  let tipo = "linha", periodo = "6M", serie, media, vol;
   const desenhar = () => {
-    if (serie) g.removeSeries(serie);
-    if (media) g.removeSeries(media);
+    for (const s of [serie, media, vol]) if (s) g.removeSeries(s);
     const d = velas.slice(-PERIODOS[periodo]), ini = velas.length - d.length;
+    vol = volume(g, d);
     if (tipo === "velas") {
-      serie = g.addCandlestickSeries({ upColor: "#44a282", downColor: "#e5566f", borderVisible: false, wickUpColor: "#44a282", wickDownColor: "#e5566f", priceLineVisible: false });
+      serie = g.addCandlestickSeries({ upColor: "#5fe0a4", downColor: "#ff6b5e", borderVisible: false, wickUpColor: "#5fe0a4", wickDownColor: "#ff6b5e", priceLineVisible: false });
       serie.setData(d.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
     } else {
-      serie = area(g);
-      serie.setData(d.map((v) => ({ time: v[0], value: v[4] })));
+      serie = linhaTendencia(g, d.map((v) => [v[0], v[4]]));
     }
-    media = g.addLineSeries({ color: "#ffb547", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    media = g.addLineSeries({ color: "rgba(255,255,255,.6)", lineWidth: 1, lineStyle: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
     media.setData(d.map((v, i) => { const j = ini + i; return j < 19 ? null : { time: v[0], value: velas.slice(j - 19, j + 1).reduce((s, x) => s + x[4], 0) / 20 }; }).filter(Boolean));
     g.timeScale().fitContent();
   };
@@ -556,7 +587,11 @@ function filtrar() {
   $("#paleta-lista").innerHTML = res.map(([p, u], i) => `<a href="#acao/${esc(p)}" class="${i ? "" : "sel"}">${ativoCel(p)}<span class="dir">${num(precoDe(p))}<br>${varCel(u.var_dia)}</span></a>`).join("")
     || `<div class="vazio">Nenhuma ação com "${esc(q)}" entre as que têm negociação suficiente.</div>`;
 }
-document.addEventListener("click", (e) => { if (e.target.closest("[data-busca], #abrir-busca-trilho")) abrirBusca(); });
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-busca], #abrir-busca-trilho")) abrirBusca();
+  const rolar = e.target.closest("[data-rolar]");
+  if (rolar) document.getElementById(rolar.dataset.rolar)?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 $("#paleta").onclick = (e) => { if (e.target.id === "paleta" || e.target.closest("a")) fecharBusca(); };
 $("#paleta-input").oninput = filtrar;
 $("#paleta-input").onkeydown = (e) => {

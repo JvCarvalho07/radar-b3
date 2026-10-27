@@ -197,8 +197,20 @@ def metricas_de_preco(hist: pd.DataFrame) -> dict:
 def resumo_mercado() -> dict:
     """Ibovespa (Yahoo) e dólar comercial (AwesomeAPI): valor e variação do dia."""
     resultado = {}
+    arq_ibov = _cache("ibovespa")
+    fech = None
+    for _ in range(2):  # o Yahoo às vezes devolve vazio; uma segunda tentativa costuma resolver
+        try:
+            fech = yf.Ticker("^BVSP").history(period="1y")["Close"].dropna()
+            if len(fech) > 1:
+                arq_ibov.write_bytes(pickle.dumps(fech))
+                break
+        except Exception as erro:
+            log.warning("Falha ao obter Ibovespa: %s", erro)
+        fech = None
+    if fech is None:
+        fech = _ler_cache(arq_ibov)  # último valor bom do dia
     try:
-        fech = yf.Ticker("^BVSP").history(period="1y")["Close"].dropna()
         resultado["ibovespa"] = {
             "valor": float(fech.iloc[-1]),
             "var_dia": (float(fech.iloc[-1]) / float(fech.iloc[-2]) - 1) * 100,
