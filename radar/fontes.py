@@ -41,6 +41,18 @@ def _cache(nome: str) -> Path:
     return PASTA_CACHE / f"{nome}_{date.today():%Y-%m-%d}.pkl"
 
 
+def _ler_cache(arq: Path):
+    """Lê um cache; se estiver corrompido ou foi salvo por outro ambiente, descarta."""
+    if not arq.exists():
+        return None
+    try:
+        return pickle.loads(arq.read_bytes())
+    except Exception as erro:
+        log.warning("Cache %s ilegível (%s); baixando de novo.", arq.name, erro)
+        arq.unlink(missing_ok=True)
+        return None
+
+
 def _limpar_cache_antigo():
     hoje = f"{date.today():%Y-%m-%d}"
     for arq in PASTA_CACHE.glob("*.pkl"):
@@ -65,8 +77,9 @@ def _numero_br(valor):
 def baixar_fundamentus() -> pd.DataFrame:
     """Tabela com ~1000 papéis da B3 e seus indicadores (cache de 1 dia)."""
     arq = _cache("fundamentus")
-    if arq.exists():
-        return pd.read_pickle(arq)
+    em_cache = _ler_cache(arq)
+    if em_cache is not None:
+        return em_cache
     resp = requests.get(URL_FUNDAMENTUS, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     html = resp.content.decode("iso-8859-1")
@@ -85,7 +98,7 @@ def baixar_fundamentus() -> pd.DataFrame:
     # Bancos e seguradoras: o Fundamentus zera indicadores que não se aplicam a eles.
     df["financeira"] = (df["liq_corr"] == 0) & (df["div_liq_patrim"] == 0)
     _limpar_cache_antigo()
-    df.to_pickle(arq)
+    arq.write_bytes(pickle.dumps(df))
     return df
 
 
@@ -119,7 +132,7 @@ def baixar_historico(papeis) -> dict[str, pd.DataFrame]:
     """Histórico diário de 1 ano. Usa o cache do dia e atualiza só os últimos pregões."""
     papeis = set(papeis)
     arq = _cache("historico")
-    cache = pickle.loads(arq.read_bytes()) if arq.exists() else {}
+    cache = _ler_cache(arq) or {}
 
     faltando = papeis - set(cache)
     cache.update(_download(faltando, "1y"))
