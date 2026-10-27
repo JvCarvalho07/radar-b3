@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Radar B3</title>
+  <meta name="theme-color" content="#0b0f14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone-192.png">
+  <link rel="apple-touch-icon" href="icones/icone-180.png">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="topo">
+    <h1>📡 Radar B3</h1>
+    <span id="atualizado" class="sutil"></span>
+  </header>
+
+  <nav class="abas" id="abas">
+    <a href="#inicio" data-aba="inicio">Início</a>
+    <a href="#estrategias" data-aba="estrategias">Estratégias</a>
+    <a href="#acao" data-aba="acao">Ação</a>
+    <a href="#watchlist" data-aba="watchlist">Watchlist</a>
+    <a href="#alertas" data-aba="alertas">Alertas</a>
+  </nav>
+
+  <main id="conteudo"><p class="sutil">Carregando…</p></main>
+
+  <footer class="rodape">
+    Triagem pelos critérios definidos por você. Não é recomendação de compra ou venda.
+    Preços com cerca de 15 min de atraso; fontes: Fundamentus, Yahoo Finance e AwesomeAPI.
+  </footer>
+
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

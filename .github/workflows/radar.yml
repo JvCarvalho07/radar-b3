@@ -1,0 +1,80 @@
+name: Radar B3
+
+on:
+  schedule:
+    - cron: "*/15 13-20 * * 1-5"  # a cada 15 min, 10:00–17:45 em Brasília (UTC-3), seg–sex
+    - cron: "10 21 * * 1-5"       # 18:10, depois do fechamento
+  workflow_dispatch:              # botão "Run workflow" na aba Actions
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # salvar o estado na branch "dados"
+  pages: write
+  id-token: write
+
+# Nunca rodar duas triagens ao mesmo tempo (evita alertas duplicados).
+concurrency:
+  group: radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Data de hoje
+        id: hoje
+        run: echo "data=$(TZ=America/Sao_Paulo date +%F)" >> "$GITHUB_OUTPUT"
+
+      # Fundamentos e histórico de 1 ano: baixados uma vez por dia, reaproveitados nas outras execuções.
+      - uses: actions/cache@v4
+        with:
+          path: cache
+          key: cache-${{ steps.hoje.outputs.data }}-${{ github.run_id }}
+          restore-keys: cache-${{ steps.hoje.outputs.data }}-
+
+      - name: Restaurar estado (branch dados)
+        run: |
+          if git ls-remote --exit-code --heads origin dados; then
+            git fetch --depth=1 origin dados
+            git worktree add dados origin/dados
+          else
+            git worktree add --orphan -b dados dados
+          fi
+
+      - name: Triagem e notificações
+        env:
+          PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: python scan.py
+
+      - name: Salvar estado
+        working-directory: dados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Atualiza estado do Radar"
+            git push origin HEAD:dados
+          fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: publico
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,73 @@
+# Configuração do Radar B3.
+# Edite os números à vontade; não precisa mexer no código.
+#
+# Campos disponíveis nos critérios:
+#   Fundamentos (Fundamentus): cotacao, pl, pvp, psr, dy, ev_ebit, ev_ebitda,
+#     mrg_bruta, mrg_ebit, mrg_liq, liq_corr, roic, roe, liq_2meses,
+#     patrim_liq, div_liq_patrim, cresc_rec_5a
+#   Preço (Yahoo Finance): queda_52s (% abaixo da máxima de 52 semanas),
+#     var_dia (%), var_30d (%), var_1a (%)
+#
+# Percentuais (dy, roe, margens, queda_52s, var_*) são em pontos: 6 = 6%.
+#
+# Bancos e seguradoras ("financeiras") não têm dívida líquida, margens nem ROIC no
+# sentido usual. Para eles vale "criterios_financeiras"; se uma estratégia não tiver
+# essa lista, financeiras ficam de fora dela.
+
+# Ignora papéis com volume médio diário (últimos 2 meses) abaixo disso, em R$.
+# Sem esse filtro aparecem ações sem negociação com indicadores absurdos.
+liquidez_minima: 2000000
+
+estrategias:
+  valor_dividendos:
+    nome: "Valor e dividendos"
+    descricao: "Empresas baratas, lucrativas, pouco endividadas e que pagam bons dividendos."
+    criterios:
+      - { campo: pl, min: 0.5, max: 10 }
+      - { campo: pvp, min: 0.1, max: 2 }
+      - { campo: dy, min: 6, max: 25 }
+      - { campo: roe, min: 12 }
+      - { campo: div_liq_patrim, max: 1.5 }
+    criterios_financeiras:
+      - { campo: pl, min: 0.5, max: 10 }
+      - { campo: pvp, min: 0.1, max: 1.5 }
+      - { campo: dy, min: 6, max: 25 }
+      - { campo: roe, min: 12 }
+
+  caiu_demais:
+    nome: "Caiu demais"
+    descricao: "Bons fundamentos, mas o preço está muito abaixo da máxima de 52 semanas."
+    criterios:
+      - { campo: pl, min: 0.5, max: 15 }
+      - { campo: roe, min: 10 }
+      - { campo: div_liq_patrim, max: 2 }
+      - { campo: queda_52s, min: 30 }
+    criterios_financeiras:
+      - { campo: pl, min: 0.5, max: 15 }
+      - { campo: pvp, min: 0.1, max: 2 }
+      - { campo: roe, min: 10 }
+      - { campo: queda_52s, min: 30 }
+
+  qualidade:
+    nome: "Qualidade"
+    descricao: "Alta rentabilidade e margens, crescimento de receita e dívida baixa."
+    criterios:
+      - { campo: roic, min: 15 }
+      - { campo: roe, min: 15 }
+      - { campo: mrg_liq, min: 10 }
+      - { campo: cresc_rec_5a, min: 5 }
+      - { campo: div_liq_patrim, max: 1 }
+      - { campo: pl, min: 0.5, max: 25 }
+    criterios_financeiras:
+      - { campo: roe, min: 18 }
+      - { campo: mrg_liq, min: 15 }
+      - { campo: pvp, min: 0.1, max: 3 }
+      - { campo: pl, min: 0.5, max: 15 }
+
+# Suas ações acompanhadas de perto. Os alertas de preço são opcionais.
+watchlist:
+  - { papel: PETR4 }
+  - { papel: VALE3 }
+  - { papel: ITUB4 }
+  - { papel: BBAS3, abaixo_de: 20.00 }
+  - { papel: WEGE3, acima_de: 60.00 }

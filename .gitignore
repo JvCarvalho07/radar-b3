@@ -1,0 +1,12 @@
+# Segredos (nunca publicar)
+.env
+vapid_private.pem
+inscricoes_push.txt
+
+# Gerados
+dados/
+cache/
+publico/
+__pycache__/
+.venv/
+.claude/
