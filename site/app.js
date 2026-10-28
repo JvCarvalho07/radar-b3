@@ -56,6 +56,7 @@ async function carregar() {
   }
   for (const w of estado.resultado.watchlist) estado.universo[w.papel] ??= { preco: w.preco, var_dia: w.var_dia, var_30d: w.var_30d, queda_52s: w.queda_52s };
   estado.estrategia ??= Object.keys(estado.resultado.estrategias)[0];
+  $("#status-texto").textContent = `Atualizado ${quando(estado.resultado.gerado_em)}`;
   rotear();
 }
 
@@ -275,15 +276,47 @@ function pertoDeEntrar() {
   </section>`;
 }
 
+// Linha compacta de ação para as colunas de "O que olhar hoje".
+function linhaOlhar(p, extra) {
+  const u = estado.universo[p] || {};
+  return `<a class="linha-olhar" href="#acao/${esc(p)}">${logo(p)}
+    <span class="meio"><b>${esc(p)}</b><span>${extra ?? esc(curto(u.nome) || "")}</span></span>
+    <span class="fim"><b>${reais(precoDe(p))}</b><span class="pilula ${cls(u.var_dia)}">${sinal(u.var_dia)}</span></span></a>`;
+}
+
+// O que pede atenção: alertas de preço que dispararam, entradas e saídas das estratégias
+// e ações da watchlist que se mexeram muito hoje.
+function pedeAtencao() {
+  const itens = [];
+  for (const w of estado.resultado.watchlist) {
+    if (w.preco == null) continue;
+    if (w.abaixo_de && w.preco <= w.abaixo_de) itens.push({ p: w.papel, t: `Abaixo de ${reais(w.abaixo_de)}`, d: "Seu alerta de preço disparou", tipo: "neg" });
+    if (w.acima_de && w.preco >= w.acima_de) itens.push({ p: w.papel, t: `Acima de ${reais(w.acima_de)}`, d: "Seu alerta de preço disparou", tipo: "pos" });
+    if (Math.abs(w.var_dia ?? 0) >= 3) itens.push({ p: w.papel, t: `${sinal(w.var_dia)} hoje`, d: "Movimento forte numa ação da sua watchlist", tipo: cls(w.var_dia) });
+  }
+  for (const e of eventos(estado.historico.slice(0, 1)).filter((e) => e.tipo !== "info")) itens.push({ p: e.p, t: e.t, d: e.d, tipo: e.tipo });
+  return itens.slice(0, 4);
+}
+
 function telaInicio() {
   const r = estado.resultado, ib = r.mercado?.ibovespa, us = r.mercado?.dolar;
   const ests = Object.entries(r.estrategias);
-  const n = eventos(estado.historico.slice(0, 1)).filter((e) => e.tipo !== "info").length;
-  const dest = acaoDestaque(), ud = estado.universo[dest] || {};
   const movers = Object.entries(estado.universo).filter(([, u]) => u.var_dia != null);
+  const quedas = [...movers].sort((a, b) => a[1].var_dia - b[1].var_dia), altas = [...quedas].reverse();
+  const caiu = movers.filter(([, u]) => u.var_dia < 0).length, subiu = movers.filter(([, u]) => u.var_dia > 0).length;
+  const perto = (typeof resumoRede === "function" ? resumoRede() : []).filter((l) => l.faltam === 1)
+    .sort((a, b) => (b.u.liq_2meses || 0) - (a.u.liq_2meses || 0));
+  const faltaTxt = (l) => {
+    const i = l.r.itens.find((x) => x.falha || x.semDado);
+    if (!i) return "";
+    const p = PCT.has(i.c.campo) ? "%" : "";
+    return i.semDado ? `${ROTULOS[i.c.campo] || i.c.campo}: sem dado` : `${ROTULOS[i.c.campo] || i.c.campo} ${num(i.v, 1)}${p}, limite ${num(i.c.min != null && i.v < i.c.min ? i.c.min : i.c.max, 1)}${p}`;
+  };
+  const atencao = pedeAtencao();
   tela.innerHTML = `
-    ${cabecalho("Visão geral", `${ib ? `Ibovespa em <b>${num(ib.valor, 0)}</b> pontos, <b class="${cls(ib.var_dia)}">${sinal(ib.var_dia)}</b> hoje.` : "O Ibovespa não respondeu nesta atualização."}
-      ${estado.historico.length ? (n ? ` <b>${n} mudança${n > 1 ? "s" : ""}</b> nas suas estratégias na última atualização.` : " Nenhuma mudança nas suas estratégias na última atualização.") : ""}`)}
+    ${cabecalho("Visão geral", `${ib ? `Ibovespa <b class="${cls(ib.var_dia)}">${sinal(ib.var_dia)}</b> hoje, em ${num(ib.valor, 0)} pontos.` : ""}
+      Das ${movers.length} ações acompanhadas, <b class="neg">${caiu} caíram</b> e <b class="pos">${subiu} subiram</b>.
+      ${quedas[0] ? `A maior queda foi <a href="#acao/${esc(quedas[0][0])}"><b>${esc(quedas[0][0])}</b></a> (${sinal(quedas[0][1].var_dia)}).` : ""}`)}
     <div class="heroi">
       <section class="painel h-ibov coluna-flex" id="p-ibov">
         <div class="seletor-topo" role="tablist" aria-label="O que mostrar no gráfico">
@@ -299,11 +332,13 @@ function telaInicio() {
         <div class="grafico" id="g-ibov">${ib?.serie ? "" : '<div class="vazio" style="margin:20px 6px">O Yahoo Finance não respondeu nesta atualização. O gráfico volta na próxima, em até 15 minutos.</div>'}</div>
       </section>
 
-      ${pertoDeEntrar()}
-
-      <section class="painel">
-        <div class="painel-cabeca"><h2>Ibovespa mês a mês</h2><span class="extra">variação de cada mês</span></div>
-        ${barrasMeses(ib?.serie)}
+      <section class="painel olhar" id="olhar">
+        <div class="painel-cabeca"><h2>O que olhar hoje</h2><a class="ver-todos" href="#acao" data-lista="var_dia">Ver as ${movers.length} ações<i class="ti ti-chevron-right"></i></a></div>
+        <div class="olhar-grade">
+          <div><h3 class="olhar-titulo neg"><i class="ti ti-trending-down"></i>Caíram mais</h3>${quedas.slice(0, 4).map(([p, u]) => linhaOlhar(p, `${sinal(u.var_30d, 1)} em 30 dias`)).join("")}</div>
+          <div><h3 class="olhar-titulo pos"><i class="ti ti-trending-up"></i>Subiram mais</h3>${altas.slice(0, 4).map(([p, u]) => linhaOlhar(p, `${sinal(u.var_30d, 1)} em 30 dias`)).join("")}</div>
+          <div><h3 class="olhar-titulo"><i class="ti ti-target-arrow"></i>Perto de entrar</h3>${perto.slice(0, 4).map((l) => linhaOlhar(l.papel, esc(faltaTxt(l)))).join("") || '<div class="vazio">Nenhuma ação a 1 critério agora.</div>'}</div>
+        </div>
       </section>
 
       <div class="h-direita">
@@ -313,13 +348,14 @@ function telaInicio() {
           <div class="dois-botoes" id="pilha-botoes"></div>
         </section>
         <section class="painel" style="flex:1">
-          <div class="painel-cabeca"><h2>Últimas mudanças</h2><a class="ver-todos" href="#alertas">Ver todas<i class="ti ti-chevron-right"></i></a></div>
-          ${eventos(estado.historico.slice(0, 3)).slice(0, 3).map(mudancaHTML).join("") || '<div class="vazio">Nenhuma mudança registrada ainda.</div>'}
+          <div class="painel-cabeca"><h2>Pede sua atenção</h2><a class="ver-todos" href="#alertas">Alertas<i class="ti ti-chevron-right"></i></a></div>
+          ${atencao.map((a) => `<a class="mudanca" href="#acao/${esc(a.p)}">${logo(a.p)}<div style="min-width:0"><b>${esc(a.p)} · ${esc(a.t)}</b><p>${esc(a.d)}</p></div><span class="quando"><span class="${a.tipo}" style="font-weight:800;font-size:16px">${a.tipo === "neg" ? "↓" : a.tipo === "pos" ? "↑" : "•"}</span></span></a>`).join("")
+            || '<div class="vazio">Nada pedindo atenção agora: nenhum alerta disparou e nada entrou ou saiu das estratégias.</div>'}
         </section>
       </div>
     </div>
 
-    ${avisoPush()}
+    <div id="slot-mapa" style="display:contents"></div>
 
     <section>
       <div class="painel-cabeca" style="margin:8px 4px 14px"><h2>Suas estratégias</h2><a class="ver-todos" href="#estrategias">Abrir estratégias<i class="ti ti-chevron-right"></i></a></div>
@@ -332,33 +368,13 @@ function telaInicio() {
     </section>
 
     <div id="slot-rede" style="display:contents"></div>
-
-    <section class="painel s7">
-      <div class="painel-cabeca"><h2>Em movimento hoje</h2><span class="extra">10 de ${movers.length}</span>
-        <div class="pilulas" style="margin-left:auto"><button type="button" data-mov="alta" class="ativo">Maiores altas</button><button type="button" data-mov="baixa">Maiores baixas</button></div></div>
-      <div class="rolagem"><table><thead><tr><th>Ação</th><th class="n">Preço</th><th class="n">Hoje</th><th class="n esconde-celular">30 dias</th></tr></thead><tbody id="t-mov"></tbody></table></div>
-    </section>
-    <section class="painel s5">
-      <div class="painel-cabeca"><h2>Mercado hoje</h2></div>
-      <div class="kpis">
-        <div><div class="faint">Dólar ${us?.fonte === "PTAX/BC" ? "(PTAX)" : "comercial"}</div><div class="figura" style="font-size:24px;line-height:30px">${reais(us?.valor, 3)}</div><div class="delta ${cls(us?.var_dia)}">${sinal(us?.var_dia)} hoje</div></div>
-        <div><div class="faint">Ações acompanhadas</div><div class="figura" style="font-size:24px;line-height:30px">${r.papeis_liquidos}</div><div class="faint">de ${r.total_papeis} na B3</div></div>
-      </div>
-      <p class="muted">Só entram na triagem ações com pelo menos R$ 2 milhões negociados por dia, em média. As outras costumam ter preços e indicadores distorcidos.</p>
-    </section>
+    ${avisoPush()}
     ${rodape()}`;
 
   montarPilha(0);
+  montarMapa($("#slot-mapa"));
   montarRede($("#slot-rede"));
   montarGlobo($("#slot-rede"));
-  const mov = (lado) => {
-    const lista = [...movers].sort((a, b) => lado === "alta" ? b[1].var_dia - a[1].var_dia : a[1].var_dia - b[1].var_dia).slice(0, 10);
-    $("#t-mov").innerHTML = lista.map(([p, u]) => `<tr data-href="#acao/${esc(p)}"><td>${ativoCel(p)}</td><td class="n">${num(precoDe(p))}</td><td class="n">${varCel(u.var_dia)}</td><td class="n esconde-celular">${varCel(u.var_30d, 1)}</td></tr>`).join("");
-    ligarLinhas();
-  };
-  mov("alta");
-  ligarAbas(tela, "mov", mov);
-
   if (window.LightweightCharts) montarTopo(ib, us);
 }
 
@@ -560,6 +576,9 @@ function marcosRegua(u, preco, comAnalistas) {
   return m;
 }
 
+// Rótulos perto das pontas da régua crescem para dentro, para nunca saírem da tela.
+const ancora = (x) => x > 82 ? "transform:translateX(-100%);align-items:flex-end;text-align:right"
+  : x < 18 ? "transform:none;align-items:flex-start;text-align:left" : "";
 function regua(u, preco) {
   const temA = (u.analistas || 0) >= 3 && u.alvo_medio;
   const marcos = marcosRegua(u, preco, temA);
@@ -587,12 +606,12 @@ function regua(u, preco) {
   });
   const xh = x(preco), pistas = Math.max(...posicionados.map((m) => m.pista + m.itens.length * 0.4)) + 0.3;
   return `<div class="regua" style="padding-bottom:${30 + pistas * 44}px" role="img" aria-label="Régua de preço de ${num(lo)} a ${num(hi)} reais">
-    <div class="marco hoje" style="left:${xh}%;top:0"><div class="rot">Hoje<b>${num(preco)}</b></div><div class="haste" style="height:16px"></div></div>
+    <div class="marco hoje" style="left:${xh}%;top:0;${ancora(xh)}"><div class="rot">Hoje<b>${num(preco)}</b></div><div class="haste" style="height:16px"></div></div>
     <div class="regua-trilha">
       ${u.faixa_1m ? `<div class="regua-faixa" style="left:${x(u.faixa_1m[0])}%;width:${x(u.faixa_1m[1]) - x(u.faixa_1m[0])}%" title="Faixa provável em 1 mês"></div>` : ""}
       ${temA && u.alvo_min && u.alvo_max ? `<div class="regua-alvo" style="left:${x(u.alvo_min)}%;width:${Math.max(0.5, x(u.alvo_max) - x(u.alvo_min))}%" title="Alvos dos analistas, do menor ao maior"></div>` : ""}
     </div>
-    ${posicionados.map((g) => `<div class="marco ${g.sec ? "secundario" : ""}" style="left:${g.x}%;top:56px"><div class="haste" style="height:${8 + g.pista * 44}px"></div>
+    ${posicionados.map((g) => `<div class="marco ${g.sec ? "secundario" : ""}" style="left:${g.x}%;top:56px;${ancora(g.x)}"><div class="haste" style="height:${8 + g.pista * 44}px"></div>
       <div class="rot">${g.itens.map((m) => `${m.rot} <b style="display:inline">${fora(m.v).startsWith("←") ? "← " : ""}${num(m.v)}${fora(m.v).endsWith("→") ? " →" : ""}</b>`).join("<br>")}</div></div>`).join("")}
   </div>`;
 }
@@ -784,6 +803,8 @@ function filtrar() {
 document.addEventListener("click", (e) => {
   if (e.target.closest("[data-busca], #abrir-busca-trilho")) abrirBusca();
   if (e.target.closest("[data-comprar]")) estado.rolarPara = "comprar";
+  const ordemLista = e.target.closest("[data-lista]");
+  if (ordemLista) estado.lista = { q: "", setor: "", campo: ordemLista.dataset.lista, desc: false };
   const rolar = e.target.closest("[data-rolar]");
   if (rolar) document.getElementById(rolar.dataset.rolar)?.scrollIntoView({ behavior: "smooth", block: "start" });
 });

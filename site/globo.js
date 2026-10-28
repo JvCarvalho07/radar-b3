@@ -21,10 +21,9 @@ async function montarGlobo(slot) {
     <div class="painel-cabeca"><h2>O mundo hoje</h2>
       <div class="pilulas" style="margin-left:auto"><button type="button" data-modo="moedas" class="ativo">Moedas em reais</button><button type="button" data-modo="bolsas">Bolsas</button></div></div>
     <div class="mundo-grade">
-      <div class="globo-caixa"><svg class="globo" viewBox="0 0 600 600" role="img" aria-label="Globo com a variação de cada país"></svg><div class="dica-globo"></div>
-        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p>
-        <div class="destaques-globo" id="destaques-globo"></div></div>
-      <aside class="mundo-lista" id="mundo-lista"><div class="carregando"></div><div class="carregando" style="width:40%"></div></aside>
+      <div class="globo-caixa"><div class="zoom-globo"><button type="button" data-zoom="1.4" aria-label="Aproximar">+</button><button type="button" data-zoom="0.71" aria-label="Afastar">−</button><button type="button" data-zoom="0" aria-label="Voltar ao tamanho normal"><i class="ti ti-focus-centered"></i></button></div><svg class="globo" viewBox="0 0 600 600" role="img" aria-label="Globo com a variação de cada país"></svg><div class="dica-globo"></div>
+        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p></div>
+      <aside class="mundo-lado"><div class="destaques-globo" id="destaques-globo"><div class="carregando"></div></div><div class="mundo-lista" id="mundo-lista" hidden></div></aside>
     </div></section>`);
   const caixa = $("#mundo"), svgEl = $(".globo", caixa), dicaEl = $(".dica-globo", caixa);
 
@@ -144,6 +143,17 @@ async function montarGlobo(slot) {
   });
   ligarAbas(caixa, "modo", (m) => { modo = m; pintar(); redesenhar(); });
 
+  const ESCALA = 282;
+  const aplicarZoom = (k) => { proj.scale(Math.max(ESCALA * 0.8, Math.min(ESCALA * 6, k))); redesenhar(); };
+  svgEl.addEventListener("wheel", (ev) => { ev.preventDefault(); pausado = true; aplicarZoom(proj.scale() * (ev.deltaY < 0 ? 1.15 : 0.87)); clearTimeout(svgEl._t); svgEl._t = setTimeout(() => { pausado = false; }, 1500); }, { passive: false });
+  $$("[data-zoom]", caixa).forEach((b) => b.onclick = () => { const f = +b.dataset.zoom; aplicarZoom(f ? proj.scale() * f : ESCALA); });
+  $("#destaques-globo").addEventListener("mouseover", (ev) => {
+    const b = ev.target.closest("[data-iso]");
+    if (!b) return;
+    const f = paises.find((p) => p.id === b.dataset.iso);
+    if (f) { const [lon, lat] = d3.geoCentroid(f); alvo = [-lon, -lat]; }
+    terras.classed("realce", (p) => p.id === b.dataset.iso);
+  });
   const relogio = d3.timer(() => {
     if (document.hidden) return;
     const [l, f] = proj.rotate();

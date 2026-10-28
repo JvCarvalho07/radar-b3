@@ -6,8 +6,8 @@
 // Até 760 px: lista. Acima: roda, e a mesma lista num bloco recolhível abaixo dela.
 // Só .rede-caixa é reescrito, então o globo (mesmo slot) não é apagado ao trocar de largura.
 
-const ANEL_R = [104, 170, 236, 300];
-const RAIO_CAPTURA = 10; // unidades do SVG (viewBox 800)
+const ANEL_R = [128, 198, 262, 322];
+const RAIO_CAPTURA = 28; // unidades do SVG (viewBox 800): o ponto mais próximo responde, sem exigir precisão
 const MQ_CELULAR = "(max-width: 760px)";
 const LARG_CARACTERE = 6.6; // px por caractere de texto 11px negrito (aproximação para centralizar o rótulo)
 const CORES_ESTRATEGIA = ["#ff7a1f", "#7fb8ff", "#8fe3b5"];
@@ -96,7 +96,7 @@ function montarRede(slot) {
 
   const corDe = Object.fromEntries(ests.map(([k], i) => [k, CORES_ESTRATEGIA[i % CORES_ESTRATEGIA.length]]));
   for (const l of linhas) {
-    l.raioNo = 2 + Math.min(2.5, Math.max(0, Math.log10((l.u.liq_2meses || 1e6) / 1e6)) * 0.8);
+    l.raioNo = 3.6 + Math.min(2.4, Math.max(0, Math.log10((l.u.liq_2meses || 1e6) / 1e6)) * 0.9);
     l.cor = corDe[l.k];
   }
   const porPapel = Object.fromEntries(linhas.map((l) => [l.papel, l]));
@@ -107,7 +107,7 @@ function montarRede(slot) {
     const ang = angs.length
       ? Math.atan2(angs.reduce((s, a) => s + Math.sin(a), 0), angs.reduce((s, a) => s + Math.cos(a), 0))
       : -Math.PI / 2 + ((i + 0.5) * 2 * Math.PI) / ests.length;
-    const [x, y] = polar(330, ang);
+    const [x, y] = polar(366, ang);
     return [k, { ang, x, y }];
   }));
 
@@ -151,7 +151,10 @@ function montarRede(slot) {
       <li><span>Faltam 2</span><b>${porAnel[2]}</b></li>
       <li><span>Faltam 3 ou mais</span><b>${porAnel[3]}</b></li>
     </ul>
-    <p class="muted" style="margin-top:14px">Passe o mouse, toque ou use Tab para ver os critérios de uma ação. Clique ou Enter abre a análise.</p>`;
+    <div class="faint" style="margin:18px 0 8px">A 1 critério de entrar (mais negociadas)</div>
+    ${linhas.filter((l) => l.faltam === 1).sort((a, b) => (b.u.liq_2meses || 0) - (a.u.liq_2meses || 0)).slice(0, 5)
+      .map((l) => `<a class="linha-olhar" href="#acao/${esc(l.papel)}">${logo(l.papel)}<span class="meio"><b>${esc(l.papel)}</b><span>${esc(estado.resultado.estrategias[l.k].nome)}</span></span></a>`).join("")}
+    <p class="muted" style="margin-top:14px">Passe o mouse perto de um ponto para ver os critérios. Clique abre a análise.</p>`;
 
   const cartao = (l) => {
     const u = l.u, e = estado.resultado.estrategias[l.k], r = l.r, preco = precoDe(l.papel);
