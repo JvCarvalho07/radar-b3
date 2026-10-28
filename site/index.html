@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Radar B3</title>
   <meta name="description" content="Triagem de ações da B3 com análise explicada e alertas.">
-  <meta name="theme-color" content="#1a1a1d">
+  <meta name="theme-color" content="#140d0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
@@ -13,22 +13,32 @@
   <link rel="apple-touch-icon" href="icones/icone-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-  <div class="app">
-    <nav class="trilho" aria-label="Navegação">
-      <a class="marca" href="#inicio" aria-label="Radar B3, visão geral"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 22a11 11 0 0 1 22 0" /><path d="M10 22a6 6 0 0 1 12 0" /><circle cx="16" cy="22" r="2.2" /><path d="M16 22 24 13" /></svg></a>
-      <div class="trilho-itens" id="menu">
-        <a href="#inicio" data-aba="inicio" title="Visão geral"><i class="ti ti-layout-dashboard"></i><span>Início</span></a>
+  <div class="app" id="app">
+    <nav class="lateral" aria-label="Navegação">
+      <div class="lateral-topo">
+        <a class="marca" href="#inicio" aria-label="Radar B3, visão geral">
+          <span class="marca-icone"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 22a11 11 0 0 1 22 0" /><path d="M10 22a6 6 0 0 1 12 0" /><circle cx="16" cy="22" r="2.2" /><path d="M16 22 24 13" /></svg></span>
+          <span class="rotulo-menu">Radar <b>B3</b></span>
+        </a>
+      </div>
+      <div class="menu" id="menu">
+        <span class="menu-grupo rotulo-menu">Mercado</span>
+        <a href="#inicio" data-aba="inicio" title="Visão geral"><i class="ti ti-smart-home"></i><span>Visão geral</span></a>
         <a href="#estrategias" data-aba="estrategias" title="Estratégias"><i class="ti ti-filter"></i><span>Estratégias</span></a>
         <a href="#acao" data-aba="acao" title="Ações"><i class="ti ti-chart-candle"></i><span>Ações</span></a>
+        <span class="menu-grupo rotulo-menu">Você</span>
         <a href="#watchlist" data-aba="watchlist" title="Watchlist"><i class="ti ti-star"></i><span>Watchlist</span></a>
         <a href="#alertas" data-aba="alertas" title="Alertas"><i class="ti ti-bell"></i><span>Alertas</span></a>
       </div>
-      <button class="trilho-busca" type="button" id="abrir-busca-trilho" title="Buscar ação (Ctrl K)" aria-label="Buscar ação"><i class="ti ti-search"></i></button>
+      <div class="lateral-base">
+        <button type="button" id="abrir-busca-trilho" title="Buscar ação (Ctrl K)" aria-label="Buscar ação"><i class="ti ti-search"></i><span class="rotulo-menu">Buscar</span></button>
+        <button type="button" id="alternar-menu" title="Abrir ou fechar o menu" aria-label="Abrir ou fechar o menu" aria-expanded="false"><i class="ti ti-layout-sidebar-left-expand"></i><span class="rotulo-menu">Recolher menu</span></button>
+      </div>
     </nav>
 
     <main class="tela" id="conteudo"></main>
