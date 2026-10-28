@@ -71,6 +71,7 @@
    "LOGG3",
    "LREN3",
    "MDNE3",
+   "MOTV3",
    "MULT3",
    "PINE4",
    "PLPL3",
@@ -141,6 +142,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T16:19:36-03:00"
+  "em": "2026-10-28T16:30:17-03:00"
  }
 }
