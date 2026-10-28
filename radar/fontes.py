@@ -109,7 +109,7 @@ def _download(papeis, periodo) -> dict[str, pd.DataFrame]:
     tickers = [f"{p}.SA" for p in papeis]
     dados = yf.download(
         tickers, period=periodo, interval="1d", group_by="ticker",
-        auto_adjust=False, progress=False, threads=True,
+        auto_adjust=False, actions=True, progress=False, threads=True,
     )
     historicos = {}
     for papel, ticker in zip(papeis, tickers):
@@ -117,7 +117,7 @@ def _download(papeis, periodo) -> dict[str, pd.DataFrame]:
             df = dados[ticker] if len(tickers) > 1 else dados
             if isinstance(df.columns, pd.MultiIndex):
                 df = df.droplevel(0, axis=1)
-            df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Close"])
+            df = df[[c for c in ("Open", "High", "Low", "Close", "Volume", "Dividends") if c in df.columns]].dropna(subset=["Close"])
         except KeyError:
             continue
         if not df.empty:
@@ -131,7 +131,7 @@ def _download(papeis, periodo) -> dict[str, pd.DataFrame]:
 def baixar_historico(papeis) -> dict[str, pd.DataFrame]:
     """Histórico diário de 1 ano. Usa o cache do dia e atualiza só os últimos pregões."""
     papeis = set(papeis)
-    arq = _cache("historico")
+    arq = _cache("historico2")  # v2: inclui a coluna de dividendos
     cache = _ler_cache(arq) or {}
 
     faltando = papeis - set(cache)

@@ -632,3 +632,37 @@ html { scroll-behavior: smooth; scrollbar-color: rgba(255, 140, 60, .45) transpa
 @media (max-width: 1100px) { .potencial-grade, .quase-grade { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { .brasil-grade b { font-size: 13.5px; } }
 .brasil-card .fonte-brasil { margin-top: 8px; font-size: 11.5px; color: var(--faint); }
+
+/* ---------- Carteira ---------- */
+.carteira-resumo { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; padding: 16px; }
+.carteira-resumo > div { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; background: var(--fundo-campo); min-width: 0; }
+.carteira-resumo span { font-size: 12px; color: var(--faint); }
+.carteira-resumo b { font-size: 20px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carteira-resumo em { font-style: normal; font-size: 12px; font-weight: 600; }
+.form-op { display: flex; flex-direction: column; gap: 12px; }
+.form-op label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.form-op input { height: 46px; padding: 0 14px; border-radius: 14px; background: var(--fundo-campo); border: 1px solid var(--linha-2); color: var(--texto); font: 500 15px var(--font); outline: 0; }
+.form-op input:focus { border-color: var(--laranja-2); }
+.form-op input::-webkit-calendar-picker-indicator { filter: invert(.8); }
+.form-linha { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-op .botao-fogo { margin-top: 4px; }
+.erro-form { min-height: 18px; margin: 0; font-size: 13px; color: var(--neg); }
+.acoes-carteira { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.acoes-carteira .botao { cursor: pointer; }
+.apagar-op { width: 34px; height: 34px; border-radius: 10px; color: var(--faint); }
+.apagar-op:hover { color: var(--neg); background: rgba(255, 107, 94, .12); }
+tr.sem-link { cursor: default; }
+.proventos-topo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.proventos-topo div { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; background: var(--fundo-campo); }
+.proventos-topo span { font-size: 12px; color: var(--faint); }
+.proventos-topo b { font-size: 18px; font-variant-numeric: tabular-nums; }
+@media (max-width: 1280px) { .carteira-resumo { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .carteira-resumo { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+  .carteira-resumo b { font-size: 17px; }
+  .proventos-topo { grid-template-columns: minmax(0, 1fr); }
+  .menu a { font-size: 9.5px; }
+}
+.form-op input { width: 100%; min-width: 0; box-sizing: border-box; }
+.form-linha > label { min-width: 0; }
+@media (max-width: 400px) { .form-linha { grid-template-columns: minmax(0, 1fr); } }

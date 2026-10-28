@@ -51,6 +51,10 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
         if papel in historicos:
             # Últimos ~3 meses de fechamento para os mini gráficos.
             u["spark"] = [round(float(x), 2) for x in historicos[papel]["Close"].iloc[-63:]]
+            if "Dividends" in historicos[papel]:
+                # Proventos do último ano (data com e valor por ação), para a tela da ação e a carteira
+                div = historicos[papel]["Dividends"].fillna(0)
+                u["proventos"] = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in div[div > 0].items()]
             u.update(analise.faixas(historicos[papel]))
             u.update({k: _limpo(v) for k, v in perfis.get(papel, {}).items()})
             u.update(analise.preco_justo(u.get("cotacao"), u.get("pl"), u.get("pvp"), u.get("dy")))

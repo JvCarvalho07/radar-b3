@@ -70,7 +70,7 @@ function rotear() {
   if (estado.rotaAtual) estado.rolagens[estado.rotaAtual] = window.scrollY;
   estado.rotaAtual = rota;
   const [aba, arg] = (location.hash.slice(1) || "inicio").split("/");
-  const telas = { inicio: telaInicio, estrategias: telaEstrategias, acao: telaAcao, watchlist: telaWatchlist, alertas: telaAlertas };
+  const telas = { inicio: telaInicio, estrategias: telaEstrategias, acao: telaAcao, watchlist: telaWatchlist, carteira: telaCarteira, alertas: telaAlertas };
   const nome = telas[aba] ? aba : "inicio";
   $$("#menu a").forEach((a) => a.classList.toggle("ativa", a.dataset.aba === nome));
   estado.graficos.forEach((g) => g.remove());
@@ -528,6 +528,24 @@ function telaLista() {
   desenhar();
 }
 
+// Proventos do último ano (ideia do Status Invest): datas ex, valor por ação e quanto renderia hoje.
+function painelProventos(papel, u, preco) {
+  const prov = u.proventos || [];
+  if (!prov.length) return `<section class="painel"><div class="painel-cabeca"><h2>Proventos</h2></div><div class="vazio">${esc(papel)} não pagou dividendos nem JCP no último ano, segundo o Yahoo Finance.</div></section>`;
+  const total = prov.reduce((s, [, v]) => s + v, 0);
+  return `<section class="painel">
+    <div class="painel-cabeca"><h2>Proventos do último ano</h2><span class="extra">dividendos e JCP por ação, valores brutos (Yahoo Finance)</span></div>
+    <div class="proventos-topo">
+      <div><span>Total em 12 meses</span><b>${reais(total, 4)}</b></div>
+      <div><span>Rende sobre o preço de hoje</span><b class="pos">${preco ? num((total / preco) * 100, 1) + "%" : "—"}</b></div>
+      <div><span>Com 100 ações você receberia</span><b>${reais(total * 100)}</b></div>
+    </div>
+    <div class="rolagem"><table class="kv"><thead><tr><th>Data ex (precisa ter a ação no dia anterior)</th><th class="n">Valor por ação</th></tr></thead><tbody>
+      ${[...prov].reverse().map(([d, v]) => `<tr><td>${dataBR(d)}</td><td class="n">${reais(v, 4)}</td></tr>`).join("")}
+    </tbody></table></div>
+  </section>`;
+}
+
 async function telaAcao(arg) {
   if (!arg) return telaLista();
   const papel = arg.toUpperCase();
@@ -560,6 +578,7 @@ async function telaAcao(arg) {
       <div class="grafico alto" id="g-acao"><div class="carregando"></div></div>
       <div class="acoes-topo" style="margin-top:14px">
         <button class="botao branco" type="button" data-rolar="comprar">Como comprar ${esc(papel)}</button>
+        <a class="botao vazado" href="#carteira" data-carteira="${esc(papel)}"><i class="ti ti-wallet" style="margin-right:6px"></i>Pôr na carteira</a>
         <a class="botao vazado" href="https://github.com/${RADAR.repo}/edit/main/config.yaml" target="_blank" rel="noopener">${estado.resultado.watchlist.some((w) => w.papel === papel) ? "Está na watchlist · editar" : "Pôr na watchlist"}</a>
       </div>
     </section>
@@ -596,6 +615,8 @@ async function telaAcao(arg) {
       <div class="painel-cabeca"><h2>Como os números foram calculados</h2></div>
       ${comoCalculado(u, preco, temAnalistas)}
     </section>
+
+    ${painelProventos(papel, u, preco)}
 
     <section class="painel" id="comprar">
       <div class="painel-cabeca"><h2>Como comprar ${esc(papel)}</h2></div>
@@ -851,6 +872,8 @@ function filtrar() {
 document.addEventListener("click", (e) => {
   if (e.target.closest("[data-busca], #abrir-busca-trilho")) abrirBusca();
   if (e.target.closest("[data-comprar]")) estado.rolarPara = "comprar";
+  const praCarteira = e.target.closest("[data-carteira]");
+  if (praCarteira) estado.carteiraPapel = praCarteira.dataset.carteira;
   const ordemLista = e.target.closest("[data-lista]");
   if (ordemLista) estado.lista = { q: "", setor: "", campo: ordemLista.dataset.lista, desc: false };
   const rolar = e.target.closest("[data-rolar]");
