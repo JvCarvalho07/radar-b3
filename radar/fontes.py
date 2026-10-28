@@ -79,7 +79,7 @@ def baixar_fundamentus() -> pd.DataFrame:
     arq = _cache("fundamentus")
     em_cache = _ler_cache(arq)
     if em_cache is not None:
-        return em_cache
+        return _sem_zeros_de_banco(em_cache)
     resp = requests.get(URL_FUNDAMENTUS, headers=HEADERS, timeout=30)
     resp.raise_for_status()
     html = resp.content.decode("iso-8859-1")
@@ -99,6 +99,21 @@ def baixar_fundamentus() -> pd.DataFrame:
     df["financeira"] = (df["liq_corr"] == 0) & (df["div_liq_patrim"] == 0)
     _limpar_cache_antigo()
     arq.write_bytes(pickle.dumps(df))
+    return _sem_zeros_de_banco(df)
+
+
+# Campos que o Fundamentus não tem para bancos e seguradoras e manda como 0.
+NAO_SE_APLICA_FIN = ["psr", "ev_ebit", "ev_ebitda", "mrg_bruta", "mrg_ebit", "mrg_liq", "roic", "liq_corr", "div_liq_patrim"]
+
+
+def _sem_zeros_de_banco(df: pd.DataFrame) -> pd.DataFrame:
+    """Nesses campos, o 0 de um banco quer dizer "não existe", não "zero". Vira sem dado, para nenhuma
+    regra reprovar (margem 0%) nem elogiar (dívida 0) um banco por um número que não é real."""
+    df = df.copy()
+    fin = df["financeira"]
+    for col in NAO_SE_APLICA_FIN:
+        if col in df.columns:
+            df.loc[fin, col] = df.loc[fin, col].replace(0, float("nan"))
     return df
 
 

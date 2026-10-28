@@ -12,7 +12,8 @@
 #
 # Bancos e seguradoras ("financeiras") não têm dívida líquida, margens nem ROIC no
 # sentido usual. Para eles vale "criterios_financeiras"; se uma estratégia não tiver
-# essa lista, financeiras ficam de fora dela.
+# essa lista, financeiras ficam de fora dela. Nessa lista use só pl, pvp, dy, roe,
+# cresc_rec_5a e os de preço: os outros campos não existem para bancos e reprovariam todos.
 
 # Ignora papéis com volume médio diário (últimos 2 meses) abaixo disso, em R$.
 # Sem esse filtro aparecem ações sem negociação com indicadores absurdos.
@@ -60,7 +61,6 @@ estrategias:
       - { campo: pl, min: 0.5, max: 25 }
     criterios_financeiras:
       - { campo: roe, min: 18 }
-      - { campo: mrg_liq, min: 15 }
       - { campo: pvp, min: 0.1, max: 3 }
       - { campo: pl, min: 0.5, max: 15 }
 

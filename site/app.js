@@ -10,7 +10,7 @@ const ROTULOS = {
   liq_corr: "Liquidez corrente", queda_52s: "Abaixo da máx. 52s", var_dia: "Var. dia", var_30d: "Var. 30d", var_1a: "Var. 1 ano",
 };
 const PCT = new Set(["dy", "roe", "roic", "mrg_liq", "cresc_rec_5a", "queda_52s", "var_dia", "var_30d", "var_1a"]);
-const NAO_SE_APLICA_FIN = new Set(["div_liq_patrim", "liq_corr", "roic", "ev_ebitda"]);
+const NAO_SE_APLICA_FIN = new Set(["div_liq_patrim", "liq_corr", "roic", "ev_ebitda", "mrg_liq", "psr"]);
 const PERIODOS = { "1M": 21, "3M": 63, "6M": 126, "1A": 9999 };
 const SETORES = {
   "Energy": "Energia", "Financial Services": "Serviços financeiros", "Basic Materials": "Materiais básicos", "Utilities": "Utilidades públicas",
