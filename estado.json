@@ -44,9 +44,11 @@
    "ALLD3",
    "ASAI3",
    "B3SA3",
+   "BBDC3",
    "BBDC4",
    "BLAU3",
    "BRBI11",
+   "BRSR6",
    "CEAB3",
    "CMIN3",
    "CSED3",
@@ -61,14 +63,16 @@
    "GGPS3",
    "GMAT3",
    "GRND3",
-   "HYPE3",
+   "IGTI11",
    "INTB3",
+   "JHSF3",
    "KEPL3",
    "LAVV3",
    "LIGT3",
    "LOGG3",
    "LREN3",
    "MDNE3",
+   "MULT3",
    "PINE4",
    "PLPL3",
    "PNVL3",
@@ -138,6 +142,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T00:02:29-03:00"
+  "em": "2026-10-28T10:49:46-03:00"
  }
 }
