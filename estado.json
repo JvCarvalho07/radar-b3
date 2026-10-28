@@ -72,6 +72,7 @@
    "LOGG3",
    "LREN3",
    "MDNE3",
+   "MOTV3",
    "MULT3",
    "PINE4",
    "PLPL3",
@@ -88,7 +89,6 @@
    "SEER3",
    "TEND3",
    "TFCO4",
-   "TGMA3",
    "TOTS3",
    "TRIS3",
    "TTEN3",
@@ -144,6 +144,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T15:28:39-03:00"
+  "em": "2026-10-28T15:47:00-03:00"
  }
 }
