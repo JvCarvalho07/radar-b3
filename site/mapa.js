@@ -16,7 +16,9 @@ const corVariacao = (v) => {
 async function montarMapa(slot) {
   slot.innerHTML = `<section class="painel mapa" id="mapa">
     <div class="painel-cabeca"><h2>Mapa do mercado hoje</h2>
-      <span class="extra">Cada quadrado é uma ação, agrupada por setor. Tamanho = quanto é negociado por dia. Cor = variação de hoje.</span></div>
+      <span class="extra">Clique num quadrado para abrir a ação</span></div>
+    <p class="como-ler"><b>Como ler:</b> cada quadrado é uma ação. Quanto <b>maior</b>, mais dinheiro ela movimenta por dia. <b>Vermelho</b> caiu hoje, <b>verde</b> subiu, e quanto mais forte a cor, maior o movimento. Os quadrados ficam agrupados por setor, então dá para ver se a queda foi geral ou só de um setor. Toque num setor abaixo para destacá-lo.</p>
+    <div class="setores-resumo" id="setores-resumo"></div>
     <div class="mapa-caixa" id="mapa-caixa"><div class="carregando"></div></div>
     <div class="mapa-legenda"><span>−4% ou mais</span><i></i><span>+4% ou mais</span></div>
     <div class="dica-mapa" id="dica-mapa"></div>
@@ -54,6 +56,24 @@ function desenharMapa(slot) {
       style="left:${f.x0}px;top:${f.y0}px;width:${w}px;height:${h}px;background:${corVariacao(v)}" aria-label="${esc(f.data.nome)}: ${sinal(v)} hoje">${texto}</a>`;
   }).join("");
   caixa.innerHTML = setores + celulas;
+
+  // Resumo: variação média de cada setor, ponderada pelo volume, da maior queda para a maior alta
+  const resumo = Object.entries(porSetor).map(([nome, itens]) => {
+    const peso = itens.reduce((s, i) => s + i.u.liq_2meses, 0);
+    return { nome, n: itens.length, v: itens.reduce((s, i) => s + i.u.var_dia * i.u.liq_2meses, 0) / peso };
+  }).sort((a, b) => a.v - b.v);
+  const chips = $("#setores-resumo", slot);
+  chips.innerHTML = resumo.map((s) => `<button type="button" class="chip-setor ${s.v >= 0 ? "pos" : "neg"}" data-setor="${esc(s.nome)}">${esc(s.nome)} <b>${sinal(s.v, 1)}</b></button>`).join("");
+  chips.onclick = (ev) => {
+    const b = ev.target.closest("[data-setor]");
+    if (!b) return;
+    const ativo = b.classList.toggle("ativo");
+    $$(".chip-setor", chips).forEach((x) => { if (x !== b) x.classList.remove("ativo"); });
+    $$(".celula-mapa", caixa).forEach((c) => {
+      const setor = SETORES[estado.universo[c.dataset.p]?.setor] || estado.universo[c.dataset.p]?.setor || "Outros";
+      c.classList.toggle("apagada", ativo && setor !== b.dataset.setor);
+    });
+  };
 
   caixa.onmousemove = (ev) => {
     const c = ev.target.closest(".celula-mapa");

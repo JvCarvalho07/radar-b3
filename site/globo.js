@@ -1,170 +1,183 @@
-// O mundo hoje: globo que gira com as bolsas de cada país ou as moedas contra o real.
+// O mundo hoje: globo em canvas (leve), centrado no Brasil, com as moedas contra o real ou as bolsas.
+// Só redesenha quando algo muda (arrastar, zoom, passar o mouse, trocar o modo): nada gira sozinho.
 const LIBS_GLOBO = [
   "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js",
   "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
 ];
 const MAPA_MUNDO = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json";
 const LEGENDAS = {
-  bolsas: "Variação do principal índice de cada país no último pregão dele. Verde subiu, vermelho caiu.",
-  moedas: "Quanto cada moeda variou contra o real na última PTAX do Banco Central. Verde: a moeda subiu, ou seja, o real ficou mais fraco. Vermelho: a moeda caiu e o real ficou mais forte.",
+  bolsas: "Cor = quanto o principal índice de cada país variou no último pregão. Verde subiu, vermelho caiu.",
+  moedas: "Cor = quanto cada moeda variou contra o real. Vermelho: a moeda caiu, ou seja, o real ficou mais forte. Verde: a moeda subiu e o real enfraqueceu.",
 };
+const SIMBOLOS = { USD: "US$", EUR: "€", GBP: "£", JPY: "¥", CHF: "Fr", CAD: "C$", AUD: "A$", DKK: "kr", NOK: "kr", SEK: "kr" };
+// Onde escrever o rótulo de cada moeda (o euro vai na Alemanha)
+const ONDE_MOEDA = { USD: "840", EUR: "276", GBP: "826", JPY: "392", CHF: "756", CAD: "124", AUD: "036", DKK: "208", NOK: "578", SEK: "752" };
 
 const carregarScript = (src) => new Promise((ok, erro) => {
-  if ([...document.scripts].some((s) => s.src === src)) return ok();
+  if ([...document.scripts].some((s) => s.src === src && s.dataset.ok)) return ok();
+  const ja = [...document.scripts].find((s) => s.src === src);
+  if (ja) { ja.addEventListener("load", ok); ja.addEventListener("error", erro); return; }
   const s = document.createElement("script");
-  s.src = src; s.onload = ok; s.onerror = erro;
+  s.src = src; s.onload = () => { s.dataset.ok = "1"; ok(); }; s.onerror = erro;
   document.head.appendChild(s);
 });
+
+function cartaoBrasil(mundo) {
+  const m = estado.resultado.mercado || {}, ib = m.ibovespa, eur = mundo.moedas?.["276"];
+  // Dólar e euro da mesma fonte (PTAX do Banco Central, contra a PTAX do dia útil anterior), para a comparação ser justa.
+  const ptaxUsd = mundo.moedas?.["840"], us = ptaxUsd ? { valor: ptaxUsd.valor, var_dia: ptaxUsd.var } : m.dolar;
+  const moedas = [...new Map(Object.values(mundo.moedas || {}).map((d) => [d.moeda, d])).values()];
+  const ganhou = moedas.filter((d) => d.var < 0).length;
+  return `<div class="brasil-card">
+    <div class="brasil-topo"><span class="bandeira" aria-hidden="true"></span><b>Brasil hoje</b></div>
+    <div class="brasil-grade">
+      <div><span>Ibovespa</span><b>${ib ? num(ib.valor, 0) : "—"}</b><em class="${cls(ib?.var_dia)}">${sinal(ib?.var_dia)}</em></div>
+      <div><span>Dólar</span><b>${reais(us?.valor, 3)}</b><em class="${cls(us?.var_dia)}">${sinal(us?.var_dia)}</em></div>
+      <div><span>Euro</span><b>${reais(eur?.valor, 3)}</b><em class="${cls(eur?.var)}">${sinal(eur?.var)}</em></div>
+    </div>
+    <p class="fonte-brasil">Dólar e euro pela PTAX do Banco Central, comparados com a PTAX do dia útil anterior.</p>
+    ${moedas.length ? `<p>O real ${ganhou === moedas.length ? "ganhou força contra todas" : ganhou === 0 ? "perdeu força contra todas" : `ganhou força contra ${ganhou} de ${moedas.length}`} as moedas acompanhadas. ${ganhou >= moedas.length / 2 ? "Real forte barateia importados e reduz o ganho em reais de exportadoras como VALE3 e SUZB3." : "Real fraco encarece importados e aumenta o ganho em reais de exportadoras como VALE3 e SUZB3."}</p>` : ""}
+  </div>`;
+}
 
 async function montarGlobo(slot) {
   slot.insertAdjacentHTML("beforeend", `<section class="painel mundo" id="mundo">
     <div class="painel-cabeca"><h2>O mundo hoje</h2>
       <div class="pilulas" style="margin-left:auto"><button type="button" data-modo="moedas" class="ativo">Moedas em reais</button><button type="button" data-modo="bolsas">Bolsas</button></div></div>
     <div class="mundo-grade">
-      <div class="globo-caixa"><div class="zoom-globo"><button type="button" data-zoom="1.4" aria-label="Aproximar">+</button><button type="button" data-zoom="0.71" aria-label="Afastar">−</button><button type="button" data-zoom="0" aria-label="Voltar ao tamanho normal"><i class="ti ti-focus-centered"></i></button></div><svg class="globo" viewBox="0 0 600 600" role="img" aria-label="Globo com a variação de cada país"></svg><div class="dica-globo"></div>
-        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p></div>
-      <aside class="mundo-lado"><div class="destaques-globo" id="destaques-globo"><div class="carregando"></div></div><div class="mundo-lista" id="mundo-lista" hidden></div></aside>
+      <div class="globo-caixa">
+        <div class="zoom-globo"><button type="button" data-zoom="1.4" aria-label="Aproximar">+</button><button type="button" data-zoom="0.71" aria-label="Afastar">−</button><button type="button" data-zoom="0" aria-label="Voltar ao Brasil"><i class="ti ti-focus-centered"></i></button></div>
+        <canvas class="globo" role="img" aria-label="Globo com a variação de cada país"></canvas><div class="dica-globo"></div>
+        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas} Arraste para girar, use a roda do mouse para aproximar.</p>
+      </div>
+      <aside class="mundo-lado"><div id="brasil-slot"></div><div class="destaques-globo" id="destaques-globo"><div class="carregando"></div></div></aside>
     </div></section>`);
-  const caixa = $("#mundo"), svgEl = $(".globo", caixa), dicaEl = $(".dica-globo", caixa);
+  const caixa = $("#mundo"), tela = $(".globo", caixa), dicaEl = $(".dica-globo", caixa);
 
   let mundo, topo;
   try {
-    await Promise.all(LIBS_GLOBO.map(carregarScript));
+    for (const src of LIBS_GLOBO) await carregarScript(src);
     [mundo, topo] = await Promise.all([carregarJSON("dados/mundo.json"), fetch(MAPA_MUNDO).then((r) => r.json())]);
   } catch {
-    $("#mundo-lista").innerHTML = '<div class="vazio">Não foi possível carregar o mapa agora.</div>';
+    $("#destaques-globo").innerHTML = '<div class="vazio">Não foi possível carregar o mapa agora.</div>';
     return;
   }
-  if (!document.body.contains(caixa)) return;  // trocou de tela enquanto carregava
+  if (!document.body.contains(caixa)) return;
+  $("#brasil-slot").innerHTML = cartaoBrasil(mundo);
 
   const paises = topojson.feature(topo, topo.objects.countries).features;
-  const proj = d3.geoOrthographic().scale(282).translate([300, 300]).clipAngle(90).rotate([50, 12]);
-  const caminho = d3.geoPath(proj);
-  const svg = d3.select(svgEl);
-  svg.append("defs").html(`<radialGradient id="oceano" cx="38%" cy="32%"><stop offset="0" stop-color="#3a2418"/><stop offset=".7" stop-color="#1b110c"/><stop offset="1" stop-color="#0d0806"/></radialGradient>
-    <radialGradient id="halo"><stop offset=".86" stop-color="rgba(255,122,31,0)"/><stop offset=".93" stop-color="rgba(255,122,31,.22)"/><stop offset="1" stop-color="rgba(255,122,31,0)"/></radialGradient>`);
-  svg.append("circle").attr("cx", 300).attr("cy", 300).attr("r", 318).attr("fill", "url(#halo)");
-  svg.append("path").datum({ type: "Sphere" }).attr("class", "esfera").attr("fill", "url(#oceano)");
-  svg.append("path").datum(d3.geoGraticule10()).attr("class", "graticula");
-  const terras = svg.append("g").selectAll("path").data(paises).join("path").attr("class", "pais");
-  const camadaRotulos = svg.append("g").attr("class", "rotulos-globo");
-
-  let modo = "moedas";
-  const SIMBOLOS = { USD: "US$", EUR: "€", GBP: "£", JPY: "¥", CHF: "Fr", CAD: "C$", AUD: "A$", DKK: "kr", NOK: "kr", SEK: "kr" };
-  // Onde escrever cada rótulo: um país por moeda (o euro vai na Alemanha) ou cada país com bolsa.
-  const ONDE_MOEDA = { USD: "840", EUR: "276", GBP: "826", JPY: "392", CHF: "756", CAD: "124", AUD: "036", DKK: "208", NOK: "578", SEK: "752" };
+  const fronteiras = topojson.mesh(topo, topo.objects.countries, (a, b) => a !== b);
   const centro = Object.fromEntries(paises.map((f) => [f.id, d3.geoCentroid(f)]));
-  // Ajustes finos de posição para países cujo centróide cai fora do continente principal
   centro["840"] = [-98, 39]; centro["250"] = [2.5, 46.5]; centro["578"] = [9, 61]; centro["124"] = [-100, 57];
-  const rotulos = () => modo === "moedas"
-    ? Object.entries(ONDE_MOEDA).filter(([m]) => Object.values(mundo.moedas || {}).some((d) => d.moeda === m)).map(([m, iso]) => {
-        const d = Object.values(mundo.moedas).find((x) => x.moeda === m);
-        return { iso, linha1: `${SIMBOLOS[m]} ${reais(d.valor, d.valor < 1 ? 4 : 2)}`, linha2: sinal(d.var), v: d.var };
-      })
-    : Object.entries(mundo.bolsas || {}).map(([iso, d]) => ({ iso, linha1: d.nome, linha2: sinal(d.var), v: d.var }));
-  const dado = (f) => mundo[modo]?.[f.id];
+  const ctx = tela.getContext("2d"), proj = d3.geoOrthographic().clipAngle(90).rotate([50, 12]);
+  const caminho = d3.geoPath(proj, ctx), grade = d3.geoGraticule10();
+  let modo = "moedas", lado = 0, escalaBase = 1, realce = null, alvo = null, pedido = false;
+
+  const dado = (id) => mundo[modo]?.[id];
   const cor = (v) => {
     if (v == null) return "rgba(255,244,236,.07)";
     const t = Math.min(1, Math.abs(v) / 2);
-    return v >= 0 ? d3.interpolateRgb("#2c3d32", "#62dca0")(t) : d3.interpolateRgb("#3f2522", "#ff6b5e")(t);
+    return v >= 0 ? d3.interpolateRgb("#2c3d32", "#3ddc8a")(t) : d3.interpolateRgb("#3f2522", "#ff5a4e")(t);
   };
-  const redesenhar = () => {
-    svg.selectAll(".esfera, .graticula").attr("d", caminho);
-    terras.attr("d", caminho);
-    const [l, f] = proj.rotate(), frente = [-l, -f];
-    camadaRotulos.selectAll("g").data(rotulos(), (r) => r.iso).join((e) => {
-      const g = e.append("g");
-      g.append("text").attr("class", "r1");
-      g.append("text").attr("class", "r2").attr("dy", 14);
-      return g;
-    }).each(function (r) {
-      const c = centro[r.iso], visivel = c && d3.geoDistance(c, frente) < 1.35;
-      const g = d3.select(this).style("display", visivel ? null : "none");
-      if (!visivel) return;
+  const rotulos = () => modo === "moedas"
+    ? Object.entries(ONDE_MOEDA).map(([m, iso]) => {
+        const d = Object.values(mundo.moedas || {}).find((x) => x.moeda === m);
+        return d && { iso, l1: `${SIMBOLOS[m]} ${reais(d.valor, d.valor < 1 ? 4 : 2)}`, l2: sinal(d.var), v: d.var };
+      }).filter(Boolean)
+    : Object.entries(mundo.bolsas || {}).map(([iso, d]) => ({ iso, l1: d.nome, l2: sinal(d.var), v: d.var }));
+
+  const desenhar = () => {
+    pedido = false;
+    const r = proj.scale(), [cx, cy] = proj.translate();
+    ctx.clearRect(0, 0, lado, lado);
+    const halo = ctx.createRadialGradient(cx, cy, r * .9, cx, cy, r * 1.08);
+    halo.addColorStop(0, "rgba(255,122,31,0)"); halo.addColorStop(.5, "rgba(255,122,31,.22)"); halo.addColorStop(1, "rgba(255,122,31,0)");
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(cx, cy, r * 1.08, 0, 2 * Math.PI); ctx.fill();
+    const mar = ctx.createRadialGradient(cx - r * .3, cy - r * .35, r * .1, cx, cy, r);
+    mar.addColorStop(0, "#3a2418"); mar.addColorStop(.7, "#1b110c"); mar.addColorStop(1, "#0d0806");
+    ctx.fillStyle = mar; ctx.beginPath(); caminho({ type: "Sphere" }); ctx.fill();
+    ctx.strokeStyle = "rgba(255,200,150,.07)"; ctx.lineWidth = .6; ctx.beginPath(); caminho(grade); ctx.stroke();
+    for (const f of paises) { ctx.fillStyle = cor(dado(f.id)?.var); ctx.beginPath(); caminho(f); ctx.fill(); }
+    ctx.strokeStyle = "rgba(14,8,5,.9)"; ctx.lineWidth = .6; ctx.beginPath(); caminho(fronteiras); ctx.stroke();
+    const contorno = (id, corL, w) => { const f = paises.find((p) => p.id === id); if (!f) return; ctx.strokeStyle = corL; ctx.lineWidth = w; ctx.beginPath(); caminho(f); ctx.stroke(); };
+    contorno("076", "#ffb057", 2);
+    if (realce) contorno(realce, "#fff", 2);
+    const frente = [-proj.rotate()[0], -proj.rotate()[1]];
+    ctx.textAlign = "center"; ctx.lineJoin = "round";
+    for (const rt of rotulos()) {
+      const c = centro[rt.iso];
+      if (!c || d3.geoDistance(c, frente) > 1.35) continue;
       const [x, y] = proj(c);
-      g.attr("transform", `translate(${x.toFixed(1)},${y.toFixed(1)})`);
-      g.select(".r1").text(r.linha1);
-      g.select(".r2").text(r.linha2).attr("class", `r2 ${r.v >= 0 ? "sobe" : "desce"}`);
-    });
+      ctx.font = "700 12.5px 'Plus Jakarta Sans', sans-serif"; ctx.lineWidth = 3.5; ctx.strokeStyle = "rgba(14,8,5,.85)";
+      ctx.strokeText(rt.l1, x, y); ctx.fillStyle = "#fff"; ctx.fillText(rt.l1, x, y);
+      ctx.font = "700 11.5px 'Plus Jakarta Sans', sans-serif"; ctx.strokeText(rt.l2, x, y + 14);
+      ctx.fillStyle = rt.v >= 0 ? "#8ff0c0" : "#ff9a8f"; ctx.fillText(rt.l2, x, y + 14);
+    }
   };
-  const pintar = () => {
-    terras.attr("fill", (f) => cor(dado(f)?.var)).classed("brasil", (f) => f.id === "076").classed("com-dado", (f) => !!dado(f));
-    $("#legenda-globo").textContent = LEGENDAS[modo];
+  const agendar = () => { if (!pedido) { pedido = true; requestAnimationFrame(desenhar); } };
+
+  const ajustar = () => {
+    const w = Math.min(tela.parentElement.clientWidth, 600), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (!w) return;
+    const k = proj.scale() / (escalaBase || 1);
+    lado = w; tela.width = w * dpr; tela.height = w * dpr; tela.style.width = `${w}px`; tela.style.height = `${w}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    escalaBase = w * .46;
+    proj.translate([w / 2, w / 2]).scale(escalaBase * (isFinite(k) && k > 0 ? k : 1));
+    agendar();
+  };
+  new ResizeObserver(ajustar).observe(tela.parentElement);
+  ajustar();
+
+  const pintarLista = () => {
     const itens = Object.entries(mundo[modo] || {}).filter(([, d], i, arr) => modo === "bolsas" || arr.findIndex(([, x]) => x.moeda === d.moeda) === i)
       .sort((a, b) => b[1].var - a[1].var);
-    $("#mundo-lista").innerHTML = itens.length ? itens.map(([iso, d]) => `<button type="button" class="mundo-item" data-iso="${iso}">
-        <span><b>${esc(modo === "bolsas" ? d.pais : d.nome)}</b><span class="faint">${esc(modo === "bolsas" ? `${d.nome} · ${num(d.valor, 0)}` : `${d.moeda} · ${reais(d.valor, d.valor < 1 ? 4 : 3)}`)}</span></span>
-        <span class="pilula ${cls(d.var)}">${sinal(d.var)}</span></button>`).join("")
-      : '<div class="vazio">Sem dados nesta atualização.</div>';
-    const linha = ([iso, d]) => `<button type="button" class="item-moeda ${d.var >= 0 ? "pos" : "neg"}" data-iso="${iso}"><b>${esc(modo === "bolsas" ? d.pais : d.nome)}</b><span>${esc(modo === "bolsas" ? num(d.valor, 0) : reais(d.valor, d.valor < 1 ? 4 : 3))}</span><em>${sinal(d.var)}</em></button>`;
-    const usd = modo === "moedas" ? itens.find(([, d]) => d.moeda === "USD") : null;
-    const resto = itens.filter((x) => x !== usd);
-    const vars = itens.map(([, d]) => d.var), sobem = vars.filter((v) => v > 0).length;
-    const frase = modo === "moedas"
-      ? (sobem === 0
-        ? `O real se valorizou contra todas as ${itens.length} moedas hoje (de ${sinal(Math.max(...vars))} a ${sinal(Math.min(...vars))}). É um movimento comum, não um dado isolado.`
-        : `${sobem} de ${itens.length} moedas subiram contra o real hoje.`)
-      : `${sobem} de ${itens.length} bolsas subiram hoje.`;
+    const linha = ([iso, d]) => `<button type="button" class="item-moeda ${d.var >= 0 ? "pos" : "neg"}" data-iso="${iso}"><b>${esc(modo === "bolsas" ? `${d.pais} · ${d.nome}` : d.nome)}</b><span>${esc(modo === "bolsas" ? num(d.valor, 0) : reais(d.valor, d.valor < 1 ? 4 : 3))}</span><em>${sinal(d.var)}</em></button>`;
     $("#destaques-globo").innerHTML = itens.length
-      ? `${usd ? `<div class="dolar-fixo"><h3 class="faint">Dólar (USD)</h3>${linha(usd)}</div>` : ""}
-         <p class="faint frase-globo">${frase}</p>
-         <div class="todos-destaques"><h3 class="faint">${modo === "bolsas" ? "Todas as bolsas" : "Demais moedas"}, da maior alta para a maior queda</h3>${resto.map(linha).join("")}</div>`
-      : "";
+      ? `<h3 class="faint">${modo === "bolsas" ? "Bolsas do mundo, da maior alta para a maior queda" : "Moedas em reais, da maior alta para a maior queda"}</h3>${itens.map(linha).join("")}`
+      : '<div class="vazio">Sem dados nesta atualização.</div>';
+    $("#legenda-globo").textContent = `${LEGENDAS[modo]} Arraste para girar, use a roda do mouse para aproximar.`;
   };
-  redesenhar();
-  pintar();
+  pintarLista();
 
-  // Interação: arrastar gira, passar o mouse mostra o país, a lista leva o globo até ele.
-  let pausado = false, alvo = null;
-  const reduzido = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  svg.call(d3.drag().on("start", () => { pausado = true; alvo = null; }).on("drag", (ev) => {
-    const [l, f] = proj.rotate();
-    proj.rotate([l + ev.dx * 0.3, Math.max(-60, Math.min(60, f - ev.dy * 0.3))]);
-    redesenhar();
-  }).on("end", () => { pausado = false; }));
-  terras.on("mousemove", (ev, f) => {
-    const d = dado(f), [x, y] = d3.pointer(ev, caixa.querySelector(".globo-caixa"));
-    dicaEl.innerHTML = `<b>${esc(d?.pais || f.properties.name)}</b>${d ? `${esc(modo === "bolsas" ? d.nome : d.nome)}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
-    dicaEl.style.left = `${x}px`; dicaEl.style.top = `${y}px`;
+  // Arrastar gira; roda do mouse e botões aproximam; passar o mouse mostra o país.
+  d3.select(tela).call(d3.drag().on("start", () => { alvo = null; }).on("drag", (ev) => {
+    const [l, f] = proj.rotate(), s = 75 / proj.scale();
+    proj.rotate([l + ev.dx * s, Math.max(-75, Math.min(75, f - ev.dy * s))]);
+    agendar();
+  }));
+  const zoom = (k) => { proj.scale(Math.max(escalaBase * .8, Math.min(escalaBase * 7, k))); agendar(); };
+  tela.addEventListener("wheel", (ev) => { ev.preventDefault(); zoom(proj.scale() * (ev.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
+  // Girar suavemente até um país (lista ao lado e botão de centralizar)
+  const irPara = (iso) => {
+    const c = centro[iso];
+    if (!c) return;
+    alvo = [-c[0], -c[1]];
+    const passo = () => {
+      if (!alvo) return;
+      const [l, f] = proj.rotate(), nl = l + (alvo[0] - l) * .15, nf = f + (alvo[1] - f) * .15;
+      proj.rotate([nl, nf]); desenhar();
+      if (Math.abs(alvo[0] - nl) < .3 && Math.abs(alvo[1] - nf) < .3) alvo = null; else requestAnimationFrame(passo);
+    };
+    requestAnimationFrame(passo);
+  };
+  $$("[data-zoom]", caixa).forEach((b) => b.onclick = () => {
+    const f = +b.dataset.zoom;
+    if (f) zoom(proj.scale() * f); else { proj.scale(escalaBase); irPara("076"); }
+  });
+  tela.addEventListener("pointermove", (ev) => {
+    const r = tela.getBoundingClientRect(), ponto = proj.invert([ev.clientX - r.left, ev.clientY - r.top]);
+    const f = ponto && d3.geoDistance(ponto, [-proj.rotate()[0], -proj.rotate()[1]]) < Math.PI / 2 ? paises.find((p) => d3.geoContains(p, ponto)) : null;
+    const id = f?.id || null;
+    if (id !== realce) { realce = id; agendar(); }
+    if (!f) { dicaEl.classList.remove("on"); return; }
+    const d = dado(f.id);
+    dicaEl.innerHTML = `<b>${esc(d?.pais || f.properties.name)}</b>${d ? `${esc(d.nome)}${modo === "moedas" ? ` · ${reais(d.valor, d.valor < 1 ? 4 : 3)}` : ""}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
+    dicaEl.style.left = `${ev.clientX - r.left}px`; dicaEl.style.top = `${ev.clientY - r.top}px`;
     dicaEl.classList.add("on");
-    pausado = true;
-  }).on("mouseleave", () => { dicaEl.classList.remove("on"); pausado = false; });
-  $("#mundo-lista").addEventListener("mouseover", (ev) => {
-    const b = ev.target.closest("[data-iso]");
-    if (!b) return;
-    const f = paises.find((p) => p.id === b.dataset.iso);
-    if (f) { const [lon, lat] = d3.geoCentroid(f); alvo = [-lon, -lat]; }
-    terras.classed("realce", (p) => p.id === b.dataset.iso);
   });
-  $("#mundo-lista").addEventListener("mouseleave", () => terras.classed("realce", false));
-  $("#destaques-globo").addEventListener("click", (ev) => {
-    const b = ev.target.closest("[data-iso]"), f = b && paises.find((p) => p.id === b.dataset.iso);
-    if (f) { const [lon, lat] = d3.geoCentroid(f); alvo = [-lon, -lat]; }
-  });
-  ligarAbas(caixa, "modo", (m) => { modo = m; pintar(); redesenhar(); });
-
-  const ESCALA = 282;
-  const aplicarZoom = (k) => { proj.scale(Math.max(ESCALA * 0.8, Math.min(ESCALA * 6, k))); redesenhar(); };
-  svgEl.addEventListener("wheel", (ev) => { ev.preventDefault(); pausado = true; aplicarZoom(proj.scale() * (ev.deltaY < 0 ? 1.15 : 0.87)); clearTimeout(svgEl._t); svgEl._t = setTimeout(() => { pausado = false; }, 1500); }, { passive: false });
-  $$("[data-zoom]", caixa).forEach((b) => b.onclick = () => { const f = +b.dataset.zoom; aplicarZoom(f ? proj.scale() * f : ESCALA); });
-  $("#destaques-globo").addEventListener("mouseover", (ev) => {
-    const b = ev.target.closest("[data-iso]");
-    if (!b) return;
-    const f = paises.find((p) => p.id === b.dataset.iso);
-    if (f) { const [lon, lat] = d3.geoCentroid(f); alvo = [-lon, -lat]; }
-    terras.classed("realce", (p) => p.id === b.dataset.iso);
-  });
-  const relogio = d3.timer(() => {
-    if (document.hidden) return;
-    const [l, f] = proj.rotate();
-    if (alvo) {
-      const nl = l + (alvo[0] - l) * 0.08, nf = f + (alvo[1] - f) * 0.08;
-      proj.rotate([nl, nf]);
-      if (Math.abs(alvo[0] - nl) < .2 && Math.abs(alvo[1] - nf) < .2) alvo = null;
-    } else if (!pausado && !reduzido) {
-      proj.rotate([l + 0.12, f]);
-    } else return;
-    redesenhar();
-  });
-  estado.pararGlobo = () => relogio.stop();
+  tela.addEventListener("pointerleave", () => { dicaEl.classList.remove("on"); realce = null; agendar(); });
+  $("#destaques-globo").addEventListener("click", (ev) => { const b = ev.target.closest("[data-iso]"); if (b) { realce = b.dataset.iso; irPara(b.dataset.iso); } });
+  ligarAbas(caixa, "modo", (m) => { modo = m; pintarLista(); agendar(); });
+  estado.pararGlobo = () => { alvo = null; };
 }

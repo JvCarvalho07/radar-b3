@@ -56,12 +56,19 @@ async function carregar() {
   }
   for (const w of estado.resultado.watchlist) estado.universo[w.papel] ??= { preco: w.preco, var_dia: w.var_dia, var_30d: w.var_30d, queda_52s: w.queda_52s };
   estado.estrategia ??= Object.keys(estado.resultado.estrategias)[0];
-  $("#status-texto").textContent = `Atualizado ${quando(estado.resultado.gerado_em)}`;
+  marcarIdade();
   rotear();
 }
 
+estado.rolagens = {};
+estado.mexeuEm = 0;
+// Se a pessoa rolar, a restauração automática da posição para de interferir.
+for (const ev of ["wheel", "touchstart", "keydown"]) window.addEventListener(ev, () => { estado.mexeuEm = Date.now(); }, { passive: true });
 function rotear() {
   if (!estado.resultado) return;
+  const rota = location.hash || "#inicio";
+  if (estado.rotaAtual) estado.rolagens[estado.rotaAtual] = window.scrollY;
+  estado.rotaAtual = rota;
   const [aba, arg] = (location.hash.slice(1) || "inicio").split("/");
   const telas = { inicio: telaInicio, estrategias: telaEstrategias, acao: telaAcao, watchlist: telaWatchlist, alertas: telaAlertas };
   const nome = telas[aba] ? aba : "inicio";
@@ -72,7 +79,11 @@ function rotear() {
   estado.pararGlobo = null;
   telas[nome](arg && decodeURIComponent(arg));
   ligarLinhas();
-  window.scrollTo({ top: 0 });
+  // Volta ao ponto onde estava nesta tela; partes que carregam depois (gráficos, mapa) mudam a altura, então reaplica.
+  const destino = estado.rolagens[rota] || 0;
+  window.scrollTo({ top: destino, behavior: "instant" });
+  const inicio = Date.now();
+  if (destino) for (const t of [150, 600, 1400]) setTimeout(() => { if (estado.rotaAtual === rota && estado.mexeuEm < inicio) window.scrollTo({ top: destino, behavior: "instant" }); }, t);
 }
 
 function ligarLinhas() {
@@ -298,6 +309,24 @@ function pedeAtencao() {
   return itens.slice(0, 4);
 }
 
+const RECOMENDACAO = { strong_buy: "compra forte", buy: "compra", hold: "neutro", underperform: "abaixo da média", sell: "venda", strong_sell: "venda forte" };
+// "Espaço para subir segundo estudos": o que analistas e fórmulas clássicas calculam, deixando claro que não é previsão.
+function secaoPotencial() {
+  const lista = Object.entries(estado.universo).map(([p, u]) => ({ p, u, preco: precoDe(p) })).filter((x) => x.preco);
+  const analistas = lista.filter((x) => (x.u.analistas || 0) >= 5 && x.u.alvo_medio).map((x) => ({ ...x, alta: dif(x.u.alvo_medio, x.preco) }))
+    .sort((a, b) => b.alta - a.alta).slice(0, 6);
+  const graham = lista.filter((x) => x.u.graham && !x.u.financeira).map((x) => ({ ...x, alta: dif(x.u.graham, x.preco) }))
+    .filter((x) => x.alta > 0 && x.alta < 200).sort((a, b) => b.alta - a.alta).slice(0, 6);
+  const linha = (x, txt) => linhaOlhar(x.p, txt).replace(`<span class="pilula ${cls(x.u.var_dia)}">${sinal(x.u.var_dia)}</span>`, `<span class="pilula pos">${sinal(x.alta, 0)}</span>`);
+  return `<section class="painel potencial" id="potencial">
+    <div class="painel-cabeca"><h2>Espaço para subir, segundo estudos</h2>
+      <div class="pilulas" style="margin-left:auto"><button type="button" data-pot="analistas" class="ativo">Alvo dos analistas</button><button type="button" data-pot="graham">Preço justo (Graham)</button></div></div>
+    <p class="aviso-estudo"><i class="ti ti-info-circle"></i>Ninguém consegue prever o preço de uma ação. Esta lista mostra quanto o preço de hoje está abaixo do que estudos calculam: o <b>alvo médio de pelo menos 5 analistas</b> de bancos e corretoras para os próximos 12 meses, ou o <b>preço justo pela fórmula de Graham</b>. Esses estudos erram e mudam com frequência. Use como ponto de partida para pesquisar, não como garantia.</p>
+    <div class="potencial-grade" data-painel-pot="analistas">${analistas.map((x) => linha(x, `alvo ${reais(x.u.alvo_medio)} · ${x.u.analistas} analistas${RECOMENDACAO[x.u.recomendacao] ? ` · consenso: ${RECOMENDACAO[x.u.recomendacao]}` : ""}`)).join("") || '<div class="vazio">Sem alvos de analistas nesta atualização.</div>'}</div>
+    <div class="potencial-grade" data-painel-pot="graham" hidden>${graham.map((x) => linha(x, `preço justo ${reais(x.u.graham)} · P/L ${num(x.u.pl, 1)} · P/VP ${num(x.u.pvp, 1)}`)).join("") || '<div class="vazio">Nenhuma ação abaixo do preço justo de Graham.</div>'}</div>
+  </section>`;
+}
+
 function telaInicio() {
   const r = estado.resultado, ib = r.mercado?.ibovespa, us = r.mercado?.dolar;
   const ests = Object.entries(r.estrategias);
@@ -357,6 +386,8 @@ function telaInicio() {
 
     <div id="slot-mapa" style="display:contents"></div>
 
+    ${secaoPotencial()}
+
     <section>
       <div class="painel-cabeca" style="margin:8px 4px 14px"><h2>Suas estratégias</h2><a class="ver-todos" href="#estrategias">Abrir estratégias<i class="ti ti-chevron-right"></i></a></div>
       <div class="cartoes-est">${ests.map(([k, e]) => `
@@ -372,8 +403,8 @@ function telaInicio() {
     ${rodape()}`;
 
   montarPilha(0);
+  ligarAbas($("#potencial"), "pot", (k) => $$("[data-painel-pot]").forEach((el) => { el.hidden = el.dataset.painelPot !== k; }));
   montarMapa($("#slot-mapa"));
-  montarRede($("#slot-rede"));
   montarGlobo($("#slot-rede"));
   if (window.LightweightCharts) montarTopo(ib, us);
 }
@@ -412,6 +443,22 @@ function telaEstrategias(arg) {
   desenharEstrategia();
 }
 
+// Ações a 1 critério desta estratégia, com o critério que falta (a parte útil da antiga Rede do Radar).
+function quaseEntram(k) {
+  if (typeof resumoRede !== "function") return "";
+  const linhas = resumoRede().filter((l) => l.porEst[k] && l.porEst[k].faltam === 1)
+    .sort((a, b) => (b.u.liq_2meses || 0) - (a.u.liq_2meses || 0)).slice(0, 12);
+  if (!linhas.length) return "";
+  const falta = (l) => {
+    const i = l.porEst[k].itens.find((x) => x.falha || x.semDado);
+    const p = PCT.has(i.c.campo) ? "%" : "";
+    return i.semDado ? `${ROTULOS[i.c.campo] || i.c.campo} sem dado` : `${ROTULOS[i.c.campo] || i.c.campo} está em ${num(i.v, 1)}${p}; o critério pede ${textoCriterio(i.c).replace((ROTULOS[i.c.campo] || i.c.campo) + " ", "")}`;
+  };
+  return `<div class="quase"><h3><i class="ti ti-target-arrow"></i>Quase entram: falta só 1 critério</h3>
+    <p class="faint">Boas candidatas para acompanhar: se o critério abaixo mudar (preço, dividendo ou balanço), elas passam a fazer parte desta estratégia.</p>
+    <div class="quase-grade">${linhas.map((l) => linhaOlhar(l.papel, esc(falta(l)))).join("")}</div></div>`;
+}
+
 function desenharEstrategia() {
   const e = estado.resultado.estrategias[estado.estrategia], o = estado.ordem;
   const linhas = e.papeis.map((p) => {
@@ -433,7 +480,8 @@ function desenharEstrategia() {
         <td class="n esconde-celular">${l.roe == null ? "—" : num(l.roe, 1) + "%"}</td><td class="n esconde-celular">${l.queda_52s == null ? "—" : num(l.queda_52s, 0) + "%"}</td>
         <td class="n esconde-celular">${varCel(l.graham_dif, 0)}</td>
         <td class="n"><span class="pos">${l.u.a_favor?.length ?? 0}</span> a favor · <span class="${l.u.atencao?.length ? "neg" : ""}">${l.u.atencao?.length ?? 0}</span> atenção</td>
-      </tr>`).join("")}</tbody></table></div>` : '<div class="vazio">Nenhuma ação cumpre todos os critérios agora.</div>'}`;
+      </tr>`).join("")}</tbody></table></div>` : '<div class="vazio">Nenhuma ação cumpre todos os critérios agora.</div>'}
+    ${quaseEntram(estado.estrategia)}`;
   $$("[data-ord]").forEach((th) => th.onclick = () => {
     const c = th.dataset.ord;
     estado.ordem = { campo: c, desc: o.campo === c ? !o.desc : c !== "papel" };
@@ -822,6 +870,34 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); abrirBusca(); }
   if (e.key === "Escape") fecharBusca();
 });
+
+// ---------- Atualização automática ----------
+// O robô do GitHub publica dados novos a cada 5 minutos de pregão. O app confere a cada minuto
+// e redesenha a tela atual sem perder a posição da rolagem quando chega algo novo.
+async function conferirNovidades() {
+  if (document.hidden || !estado.resultado) return;
+  try {
+    const novo = await carregarJSON("dados/resultado.json");
+    if (novo.gerado_em !== estado.resultado.gerado_em) {
+      const y = window.scrollY;
+      estado.rotaAtual = null;
+      await carregar();
+      window.scrollTo({ top: y, behavior: "instant" });
+    }
+  } catch { /* sem rede: tenta de novo no próximo minuto */ }
+  marcarIdade();
+}
+function marcarIdade() {
+  if (!estado.resultado) return;
+  const min = Math.round((Date.now() - new Date(estado.resultado.gerado_em)) / 60000);
+  const agora = new Date(), dia = agora.getDay(), h = agora.getHours() + agora.getMinutes() / 60;
+  const pregao = dia > 0 && dia < 6 && h >= 10 && h < 18.2;
+  const velho = pregao && min > 30;
+  const txt = min < 1 ? "Atualizado agora" : min < 60 ? `Atualizado há ${min} min` : `Atualizado ${quando(estado.resultado.gerado_em)}`;
+  $("#status-texto").textContent = velho ? `${txt} · atrasado` : txt;
+  $("#status-menu").classList.toggle("atrasado", velho);
+}
+setInterval(conferirNovidades, 60000);
 
 // ---------- Menu lateral ----------
 const app = $("#app");

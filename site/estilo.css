@@ -585,3 +585,50 @@ html { scroll-behavior: smooth; scrollbar-color: rgba(255, 140, 60, .45) transpa
   .ativo-cel .nome { max-width: 92px; }
   td { padding-right: 8px; }
 }
+
+/* ---------- Brasil hoje (lado do globo) ---------- */
+.brasil-card { padding: 16px; border-radius: 18px; margin-bottom: 14px; background: linear-gradient(135deg, rgba(0, 156, 59, .18), rgba(255, 223, 0, .08) 55%, rgba(0, 39, 118, .14)); border: 1px solid rgba(255, 223, 0, .18); }
+.brasil-topo { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 15px; }
+.bandeira { width: 26px; height: 18px; border-radius: 4px; background: #009c3b; position: relative; flex: none; }
+.bandeira::before { content: ""; position: absolute; inset: 2px 3px; background: #ffdf00; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.bandeira::after { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: #002776; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.brasil-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.brasil-grade div { display: flex; flex-direction: column; gap: 1px; padding: 10px; border-radius: 12px; background: rgba(0, 0, 0, .25); }
+.brasil-grade span { font-size: 11.5px; color: var(--faint); }
+.brasil-grade b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.brasil-grade em { font-style: normal; font-size: 12px; font-weight: 700; }
+.brasil-card p { margin-top: 10px; font-size: 12.5px; line-height: 18px; color: var(--muted); }
+.globo { display: block; margin: 0 auto; cursor: grab; touch-action: none; }
+.globo:active { cursor: grabbing; }
+.mundo-lado .destaques-globo h3 { margin: 4px 0 8px; font-size: 12.5px; font-weight: 600; }
+.mundo-lado .destaques-globo { display: flex; flex-direction: column; gap: 2px; }
+.mundo-lado .item-moeda { display: grid; grid-template-columns: 1fr auto; }
+
+/* ---------- Mapa: como ler e setores ---------- */
+.como-ler { font-size: 13.5px; line-height: 21px; color: var(--muted); margin: -4px 0 12px; max-width: 900px; }
+.como-ler b { color: var(--texto); }
+.setores-resumo { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
+.chip-setor { flex: none; display: inline-flex; gap: 6px; align-items: center; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: rgba(255, 244, 236, .05); border: 1px solid var(--linha); transition: background .15s, border-color .15s; }
+.chip-setor.neg b { color: var(--neg); } .chip-setor.pos b { color: var(--pos); }
+.chip-setor:hover { color: var(--texto); }
+.chip-setor.ativo { border-color: var(--laranja-2); background: rgba(255, 122, 31, .16); color: var(--texto); }
+.celula-mapa.apagada { opacity: .15; }
+
+/* ---------- Espaço para subir ---------- */
+.potencial { grid-column: 1 / -1; }
+.aviso-estudo { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 20px; color: var(--muted); padding: 12px 14px; border-radius: 14px; background: rgba(255, 244, 236, .04); margin-bottom: 14px; }
+.aviso-estudo .ti { color: var(--laranja-2); font-size: 18px; margin-top: 1px; }
+.aviso-estudo b { color: var(--texto); }
+.potencial-grade, .quase-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 18px; }
+
+/* ---------- Quase entram (Estratégias) ---------- */
+.quase { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--linha); }
+.quase h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.quase h3 .ti { color: var(--laranja-2); }
+.quase .faint { margin-bottom: 12px; }
+.quase .linha-olhar .meio span { white-space: normal; }
+
+.status-menu.atrasado .ponto { background: var(--laranja-2); }
+@media (max-width: 1100px) { .potencial-grade, .quase-grade { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .brasil-grade b { font-size: 13.5px; } }
+.brasil-card .fonte-brasil { margin-top: 8px; font-size: 11.5px; color: var(--faint); }
