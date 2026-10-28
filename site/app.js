@@ -942,7 +942,17 @@ $("#alternar-menu").onclick = () => {
 
 // ---------- Início ----------
 window.addEventListener("hashchange", rotear);
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+if ("serviceWorker" in navigator) {
+  // Confere se saiu versão nova do app a cada 5 minutos; quando sai, a página se recarrega sozinha (sem F5).
+  navigator.serviceWorker.register("sw.js").then((reg) => setInterval(() => reg.update().catch(() => {}), 5 * 60000)).catch(() => {});
+  let jaTinha = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!jaTinha) { jaTinha = true; return; }   // primeira instalação, não é versão nova
+    const digitando = () => document.activeElement?.matches?.("input, textarea, select");
+    const recarregar = () => { if (digitando()) setTimeout(recarregar, 3000); else location.reload(); };
+    recarregar();
+  });
+}
 tela.innerHTML = `<header class="titulo"><div><h1>Radar B3</h1><div class="carregando" style="width:320px"></div></div></header><section class="painel s8"><div class="carregando"></div><div class="carregando" style="width:40%"></div></section><section class="painel s4"><div class="carregando"></div></section>`;
 carregar();
 document.addEventListener("visibilitychange", () => { if (!document.hidden && estado.resultado) carregar(); });

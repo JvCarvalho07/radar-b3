@@ -119,7 +119,8 @@ async function montarGlobo(slot) {
   const ajustar = () => {
     const w = Math.min(tela.parentElement.clientWidth, 600), dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (!w) return;
-    const k = proj.scale() / (escalaBase || 1);
+    // Mantém o zoom da pessoa ao redimensionar; na primeira vez, o globo inteiro (escala padrão do d3 não conta)
+    const k = escalaBase > 1 ? proj.scale() / escalaBase : 1;
     lado = w; tela.width = w * dpr; tela.height = w * dpr; tela.style.width = `${w}px`; tela.style.height = `${w}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     escalaBase = w * .46;
