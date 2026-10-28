@@ -47,7 +47,6 @@
    "BBDC3",
    "BBDC4",
    "BLAU3",
-   "BMOB3",
    "BRBI11",
    "BRSR6",
    "CEAB3",
@@ -72,7 +71,6 @@
    "LOGG3",
    "LREN3",
    "MDNE3",
-   "MOTV3",
    "MULT3",
    "PINE4",
    "PLPL3",
@@ -89,7 +87,6 @@
    "SEER3",
    "TEND3",
    "TFCO4",
-   "TOTS3",
    "TRIS3",
    "TTEN3",
    "VIVA3",
@@ -144,6 +141,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T15:47:00-03:00"
+  "em": "2026-10-28T15:50:32-03:00"
  }
 }
