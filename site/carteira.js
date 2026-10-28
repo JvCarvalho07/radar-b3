@@ -138,6 +138,141 @@ function ibovEquivalente(fluxos) {
   return { v: (ganho / aplicado) * 100, desde: primeira, total };
 }
 
+// ---------- Gráficos da carteira ----------
+// Cores da divisão: tons quentes do app, do mais forte ao mais neutro; "Outras" junta o resto.
+const CORES_DIVISAO = ["#ff7a1f", "#ffb057", "#ff4d2e", "#f3d2b0", "#c46a32", "#8a5a40"];
+
+// Evolução do patrimônio, dia a dia: quantidade de cada ação (na escala de hoje) × fechamento ajustado do dia.
+// "Investido" é o custo das posições abertas em cada data (preço médio × quantidade), que só muda nas operações.
+function serieCarteira(lancamentos, velasPor) {
+  const papeis = [...new Set(lancamentos.map((l) => l.papel))];
+  const primeira = lancamentos.map((l) => l.data).sort()[0];
+  if (!primeira) return null;
+  const datas = [...new Set(papeis.flatMap((p) => (velasPor[p] || []).map((v) => v[0])))].filter((d) => d >= primeira).sort();
+  if (datas.length < 2) return null;
+  const fech = Object.fromEntries(papeis.map((p) => [p, new Map((velasPor[p] || []).map((v) => [v[0], v[4]]))]));
+  const ops = [...lancamentos].sort((a, b) => a.data.localeCompare(b.data));
+  // Custo das posições abertas logo depois de cada data com operação
+  const custoEm = new Map();
+  for (const d of [...new Set(ops.map((l) => l.data))]) custoEm.set(d, calcularCarteira(ops.filter((l) => l.data <= d)).abertas.reduce((s, p) => s + p.custo, 0));
+  const qtd = {}, ultimo = {}, serie = [];
+  let i = 0, custo = 0;
+  for (const d of datas) {
+    for (; i < ops.length && ops[i].data <= d; i++) {
+      const l = ops[i], q = l.qtd * fatorApos(l.papel, l.data);
+      qtd[l.papel] = Math.max(0, (qtd[l.papel] || 0) + (l.tipo === "compra" ? q : -q));
+      custo = custoEm.get(l.data);
+    }
+    let valor = 0, falta = false;
+    for (const p of papeis) {
+      const f = fech[p].get(d);
+      if (f != null) ultimo[p] = f;
+      if (qtd[p] > 0) { if (ultimo[p] == null) falta = true; else valor += qtd[p] * ultimo[p]; }
+    }
+    if (!falta) serie.push({ time: d, valor, custo });
+  }
+  return serie.length >= 2 ? { serie, parcial: primeira < datas[0] } : null;
+}
+
+async function montarGraficoCarteira(cart) {
+  const el = $("#g-cart");
+  if (!el) return;
+  const papeis = [...new Set(cart.lancamentos.map((l) => l.papel))];
+  const velasPor = Object.fromEntries(await Promise.all(papeis.map((p) => carregarJSON(`dados/precos/${p}.json`).then((v) => [p, v]).catch(() => [p, []]))));
+  if (!document.body.contains(el)) return;
+  estado.velasCarteira = velasPor;
+  pintarMinis(velasPor);
+  const r = serieCarteira(cart.lancamentos, velasPor);
+  if (!r) { el.innerHTML = '<div class="vazio" style="margin:20px 6px">O gráfico aparece a partir do segundo pregão depois da primeira compra.</div>'; return; }
+  el.innerHTML = "";
+  const g = grafico(el);
+  const sValor = area(g);
+  const sCusto = g.addLineSeries({ color: "rgba(247,240,234,.5)", lineWidth: 1, lineStyle: 2, lineType: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+  const caixa = document.createElement("div");
+  caixa.className = "dica";
+  el.appendChild(caixa);
+  const porData = new Map(r.serie.map((x) => [x.time, x]));
+  g.subscribeCrosshairMove((p) => {
+    const t = p.time && (typeof p.time === "string" ? p.time : `${p.time.year}-${String(p.time.month).padStart(2, "0")}-${String(p.time.day).padStart(2, "0")}`);
+    const x = p.point && t ? porData.get(t) : null;
+    if (!x) { caixa.classList.remove("on"); return; }
+    const res = x.valor - x.custo;
+    caixa.innerHTML = `${new Date(t + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}<b>${reais(x.valor)}</b>investido ${reais(x.custo)} · <span class="${cls(res)}">${res >= 0 ? "+" : "−"}${reais(Math.abs(res))}</span>`;
+    caixa.style.left = `${Math.min(Math.max(p.point.x, 90), el.clientWidth - 90)}px`;
+    caixa.style.top = `${sValor.priceToCoordinate(x.valor)}px`;
+    caixa.classList.add("on");
+  });
+  const mostrar = (per) => {
+    const n = PERIODOS[per] || 9999, parte = r.serie.slice(-n - 1);
+    sValor.setData(parte.map((x) => ({ time: x.time, value: x.valor })));
+    sCusto.setData(parte.map((x) => ({ time: x.time, value: x.custo })));
+    g.timeScale().fitContent();
+    const ini = parte[0], fim = parte.at(-1);
+    $("#cart-desde").textContent = `${r.parcial && per === "Tudo" ? "desde o início dos dados do app, " : ""}${dataBR(ini.time)} a ${dataBR(fim.time)}`;
+  };
+  ligarAbas($("#cart-periodo"), "cper", mostrar);
+  mostrar("Tudo");
+}
+
+// Mini gráfico de cada posição: preço desde a primeira compra (ou 3 meses, se for recente) e o preço médio tracejado.
+function pintarMinis(velasPor) {
+  const cart = lerCarteira(), c = calcularCarteira(cart.lancamentos);
+  for (const el of $$("[data-mini]")) {
+    const papel = el.dataset.mini, p = c.pos[papel], velas = velasPor[papel] || [];
+    if (!p || velas.length < 2) continue;
+    const primeira = cart.lancamentos.filter((l) => l.papel === papel && l.tipo === "compra").map((l) => l.data).sort()[0];
+    let pts = velas.filter((v) => v[0] >= primeira).map((v) => v[4]);
+    if (pts.length < 20) pts = velas.slice(-63).map((v) => v[4]);
+    const ref = p.pm, todos = ref ? [...pts, ref] : pts, min = Math.min(...todos), max = Math.max(...todos), alt = max - min || 1;
+    const W = 200, H = 56, y = (v) => (H - 4 - ((v - min) / alt) * (H - 8)).toFixed(1);
+    const linha = pts.map((v, i) => `${i ? "L" : "M"}${((i / (pts.length - 1)) * W).toFixed(1)} ${y(v)}`).join(" ");
+    const sobe = p.preco != null && ref ? p.preco >= ref : pts.at(-1) >= pts[0];
+    const cor = sobe ? "var(--pos)" : "var(--neg)", id = `m-${papel}`;
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sobe ? "#62dca0" : "#ff6b5e"}" stop-opacity=".28"/><stop offset="1" stop-color="${sobe ? "#62dca0" : "#ff6b5e"}" stop-opacity="0"/></linearGradient></defs>
+      <path d="${linha} L${W} ${H} L0 ${H} Z" fill="url(#${id})"/>
+      <path d="${linha}" fill="none" stroke="${cor}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+      ${ref ? `<line x1="0" x2="${W}" y1="${y(ref)}" y2="${y(ref)}" stroke="rgba(247,240,234,.55)" stroke-width="1" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>` : ""}
+    </svg>${ref ? `<span class="mini-pm" style="top:${(y(ref) / H) * 100}%">PM</span>` : ""}`;
+  }
+}
+
+// Rosca da divisão por ação (só posições com cotação). Até 6 fatias; o resto vira "Outras".
+function divisao(c) {
+  const lista = [...c.comPreco].sort((a, b) => b.valor - a.valor);
+  const fatias = lista.slice(0, 6).map((p, i) => ({ rot: p.papel, valor: p.valor, cor: CORES_DIVISAO[i], href: `#acao/${p.papel}` }));
+  const resto = lista.slice(6).reduce((s, p) => s + p.valor, 0);
+  if (resto > 0) fatias.push({ rot: `Outras ${lista.length - 6}`, valor: resto, cor: "rgba(247,240,234,.28)" });
+  const total = fatias.reduce((s, f) => s + f.valor, 0);
+  if (!total) return '<div class="vazio">Sem cotação para montar a divisão.</div>';
+  const R = 42, C = 2 * Math.PI * R;
+  let acum = 0;
+  const arcos = fatias.map((f) => {
+    const parte = (f.valor / total) * C, folga = fatias.length > 1 ? Math.min(2.2, parte * .3) : 0;
+    const s = `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${f.cor}" stroke-width="11" stroke-dasharray="${(parte - folga).toFixed(2)} ${(C - parte + folga).toFixed(2)}" stroke-dashoffset="${(-acum).toFixed(2)}" stroke-linecap="butt"><title>${esc(f.rot)}: ${num((f.valor / total) * 100, 1)}%</title></circle>`;
+    acum += parte;
+    return s;
+  }).join("");
+  const maior = fatias[0];
+  return `<div class="rosca"><svg viewBox="0 0 100 100" aria-hidden="true" style="transform:rotate(-90deg)"><circle cx="50" cy="50" r="${R}" fill="none" stroke="rgba(255,244,236,.06)" stroke-width="11"/>${arcos}</svg>
+      <div class="rosca-centro"><b>${num((maior.valor / total) * 100, 0)}%</b><span>${esc(maior.rot)}</span></div></div>
+    <ul class="rosca-legenda">${fatias.map((f) => `<li>${f.href ? `<a href="${f.href}">` : "<span>"}<i style="background:${f.cor}"></i><b>${esc(f.rot)}</b><span class="faint">${reais(f.valor)}</span><em>${num((f.valor / total) * 100, 1)}%</em>${f.href ? "</a>" : "</span>"}</li>`).join("")}</ul>`;
+}
+
+function cartaoPosicao(p, c) {
+  const u = estado.universo[p.papel] || {};
+  const peso = p.valor != null && c.valor ? (p.valor / c.valor) * 100 : null;
+  return `<a class="pos-cartao" href="#acao/${esc(p.papel)}">
+    <div class="pos-topo">${logo(p.papel)}<div class="pos-nome"><b>${esc(p.papel)}</b><span>${esc(curto(u.nome) || "")}</span></div>
+      <span class="marca-saida" data-saida-marca="${esc(p.papel)}" hidden title="Uma regra de saída disparou"><i class="ti ti-bell-ringing"></i></span>
+      ${peso != null ? `<span class="pos-peso">${num(peso, 0)}%</span>` : ""}</div>
+    <div class="mini" data-mini="${esc(p.papel)}"></div>
+    <div class="pos-base">
+      <div class="pos-res"><span>Resultado</span><b class="${cls(p.resultado)}">${p.resultado == null ? "—" : `${p.resultado >= 0 ? "+" : "−"}${reais(Math.abs(p.resultado))}`}</b><em class="${cls(p.resultado)}">${sinal(dif(p.valor, p.custo))}</em></div>
+      <dl class="pos-dados"><div><dt>Ações</dt><dd>${num(p.qtd, 0)}</dd></div><div><dt>Preço médio</dt><dd>${reais(p.pm)}</dd></div><div><dt>Hoje</dt><dd>${reais(p.preco)}</dd></div></dl>
+    </div></a>`;
+}
+
 function telaCarteira() {
   const cart = lerCarteira(), c = calcularCarteira(cart.lancamentos);
   // Rentabilidade simples: (valor de hoje + o que voltou em vendas + proventos − tudo que foi investido) ÷ investido
@@ -147,75 +282,115 @@ function telaCarteira() {
   const suspeitas = c.abertas.map((p) => p.papel).filter((x) => estado.universo[x]?.dados_suspeitos);
   const escala = c.abertas.map((p) => p.papel).filter((x) => estado.universo[x]?.escala_quebrada);
   const mes = hojeISO().slice(0, 7), vendidoMes = c.vendasMes[mes] || 0, dayMes = c.dayMes[mes] || 0;
+  // Quanto a carteira andou hoje: cada posição × a variação do dia da ação
+  const hoje = c.comPreco.reduce((s, p) => { const v = estado.universo[p.papel]?.var_dia; return v == null ? s : s + p.valor * (v / (100 + v)); }, 0);
   const papeis = Object.keys(estado.universo).sort();
   const pre = estado.carteiraPapel || "";
   estado.carteiraPapel = null;
+  const aberto = c.valor - c.investido;
 
-  tela.innerHTML = `${cabecalho("Carteira", "Registre suas compras e vendas para acompanhar preço médio, resultado e proventos. <b>Os dados ficam só neste aparelho</b>; use Exportar para guardar uma cópia.")}
-    ${cart.lancamentos.length ? `
-    <section class="painel carteira-resumo">
-      <div><span>Patrimônio hoje</span><b>${reais(c.valor)}</b><em class="faint">${c.abertas.length} ${c.abertas.length === 1 ? "ação" : "ações"}</em></div>
-      <div><span>Investido (custo)</span><b>${reais(c.investido)}</b><em class="faint">preço médio × quantidade</em></div>
-      <div><span>Resultado em aberto</span><b class="${cls(c.valor - c.investido)}">${reais(c.valor - c.investido)}</b><em class="${cls(c.valor - c.investido)}">${sinal(dif(c.valor, c.investido))}</em></div>
-      <div><span>Proventos recebidos</span><b class="pos">${reais(c.proventos)}</b><em class="faint">desde a primeira compra, valores brutos</em></div>
-      <div><span>Lucro com vendas</span><b class="${cls(c.realizado)}">${reais(c.realizado)}</b><em class="faint">já realizado, day trade incluído</em></div>
-      <div><span>Você × Ibovespa</span><b class="${cls(dife)}">${sinal(dife, 1)}</b><em class="faint">${ibov?.v != null ? `diferença em pontos; você ${sinal(rent, 1)}, Ibovespa ${sinal(ibov.v, 1)} nas mesmas datas das operações${ibov.total ? ", com dividendos (BOVA11)" : ", só preço: a diferença fica a favor da carteira, que recebe proventos"}` : ibov?.antes ? `compra anterior a ${dataBR(ibov.antes)}, início da série do Ibovespa; sem comparação` : "sem dados do período"}</em></div>
-    </section>` : ""}
-    ${c.abertas.length ? secaoSaidas() : ""}
-
-    <section class="painel s5" id="form-carteira">
-      <div class="painel-cabeca"><h2>Registrar operação</h2></div>
+  const formulario = `<div class="folha" id="folha-op" ${pre ? "" : "hidden"}>
+    <div class="folha-caixa painel" role="dialog" aria-modal="true" aria-labelledby="titulo-op">
+      <div class="painel-cabeca"><h2 id="titulo-op">Registrar operação</h2><button type="button" class="fechar-folha" id="fechar-op" aria-label="Fechar"><i class="ti ti-x"></i></button></div>
       <div class="pilulas" style="margin-bottom:14px"><button type="button" data-op="compra" class="ativo">Compra</button><button type="button" data-op="venda">Venda</button></div>
       <form class="form-op" id="form-op" novalidate>
         <label>Ação<input id="op-papel" list="lista-papeis" placeholder="Ex.: PETR4" value="${esc(pre)}" autocomplete="off" required></label>
         <datalist id="lista-papeis">${papeis.map((p) => `<option value="${p}">`).join("")}</datalist>
         <div class="form-linha">
           <label>Data<input id="op-data" type="date" value="${hojeISO()}" max="${hojeISO()}" required></label>
-          <label>Quantidade<input id="op-qtd" type="number" min="1" step="1" placeholder="100" required></label>
+          <label>Quantidade<input id="op-qtd" type="number" inputmode="numeric" min="1" step="1" placeholder="100" required></label>
         </div>
         <div class="form-linha">
-          <label>Preço por ação (R$)<input id="op-preco" type="number" min="0.01" step="0.01" placeholder="0,00" required></label>
-          <label>Taxas (R$, opcional)<input id="op-taxas" type="number" min="0" step="0.01" placeholder="0,00"></label>
+          <label>Preço por ação (R$)<input id="op-preco" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0,00" required></label>
+          <label>Taxas (R$, opcional)<input id="op-taxas" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0,00"></label>
         </div>
         <p class="erro-form" id="erro-op" role="alert"></p>
-        <button class="botao-fogo" type="submit"><i class="ti ti-plus"></i>Salvar operação</button>
+        <button class="botao-fogo" type="submit"><i class="ti ti-check"></i>Salvar operação</button>
       </form>
-      <div class="acoes-carteira">
-        <button class="botao contorno" type="button" id="exportar"><i class="ti ti-download"></i>Exportar</button>
-        <label class="botao contorno"><i class="ti ti-upload"></i>Importar<input type="file" id="importar" accept="application/json" hidden></label>
+    </div></div>`;
+
+  const importar = `<label class="botao contorno"><i class="ti ti-upload"></i>Importar<input type="file" id="importar" accept="application/json" hidden></label>`;
+
+  tela.innerHTML = `${cabecalho("Carteira", "Seu patrimônio, dia a dia. <b>Os dados ficam só neste aparelho</b>; use Exportar para guardar uma cópia.")}
+    ${!cart.lancamentos.length ? `
+    <section class="painel cart-boas-vindas">
+      <div class="cart-bv-texto">
+        <h2>Monte sua carteira</h2>
+        <p class="muted">Registre suas compras e vendas. O app calcula preço médio, resultado, proventos recebidos e desdobramentos, mostra a evolução do patrimônio em gráfico e avisa quando uma regra de saída disparar.</p>
+        <div class="cart-botoes"><button type="button" class="botao-fogo" data-abrir-op="compra"><i class="ti ti-plus"></i>Registrar primeira compra</button>${importar}</div>
+        <p class="faint">Dica: na tela de qualquer ação há o botão "Pôr na carteira".</p>
       </div>
-    </section>
+      <div class="cart-bv-arte" aria-hidden="true"><svg viewBox="0 0 220 120"><defs><linearGradient id="bv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7a1f" stop-opacity=".55"/><stop offset="1" stop-color="#ff7a1f" stop-opacity="0"/></linearGradient></defs><path d="M0 96 L30 88 L55 92 L80 70 L105 76 L130 52 L160 58 L190 30 L220 22 L220 120 L0 120Z" fill="url(#bv)"/><path d="M0 96 L30 88 L55 92 L80 70 L105 76 L130 52 L160 58 L190 30 L220 22" fill="none" stroke="#ffa24a" stroke-width="2.5"/><path d="M0 92 H220" stroke="rgba(247,240,234,.4)" stroke-dasharray="4 4"/></svg></div>
+    </section>` : `
+    <div class="cart-heroi">
+      <section class="painel cart-patrimonio coluna-flex">
+        <div class="cart-topo">
+          <div>
+            <div class="muted">Patrimônio hoje</div>
+            ${precoGrande(c.valor)}
+            <div class="cart-linha"><span class="selo ${cls(aberto)}">${aberto >= 0 ? "+" : "−"}${reais(Math.abs(aberto))} · ${sinal(dif(c.valor, c.investido))}</span><span class="faint">em aberto</span>
+              ${c.comPreco.length ? `<span class="faint">hoje <b class="${cls(hoje)}">${hoje >= 0 ? "+" : "−"}${reais(Math.abs(hoje))}</b></span>` : ""}</div>
+          </div>
+          <div class="pilulas" id="cart-periodo" role="tablist">${["1M", "3M", "6M", "Tudo"].map((p) => `<button type="button" data-cper="${p}" class="${p === "Tudo" ? "ativo" : ""}">${p}</button>`).join("")}</div>
+        </div>
+        <div class="grafico" id="g-cart"><div class="carregando"></div></div>
+        <div class="cart-legenda"><span><i class="bola"></i>Patrimônio</span><span><i class="traco"></i>Investido (custo)</span><span class="faint" id="cart-desde"></span></div>
+        <div class="cart-numeros">
+          <div><span>Investido</span><b>${reais(c.investido)}</b><em class="faint">preço médio × quantidade</em></div>
+          <div><span>Proventos recebidos</span><b class="pos">${reais(c.proventos)}</b><em class="faint">valores brutos</em></div>
+          <div><span>Lucro com vendas</span><b class="${cls(c.realizado)}">${reais(c.realizado)}</b><em class="faint">já realizado</em></div>
+          <div><span>Você × Ibovespa</span><b class="${cls(dife)}">${dife == null ? "—" : `${sinal(dife, 1).replace("%", "")} pts`}</b><em class="faint">${ibov?.v != null ? `você ${sinal(rent, 1)}, Ibovespa ${sinal(ibov.v, 1)}${ibov.total ? " com dividendos" : ""}, nas mesmas datas` : ibov?.antes ? `compras antes de ${dataBR(ibov.antes)}: sem comparação` : "sem dados do período"}</em></div>
+        </div>
+      </section>
+      <aside class="cart-lado">
+        <section class="painel cart-divisao">
+          <div class="painel-cabeca"><h2>Divisão</h2><span class="extra">${c.abertas.length} ${c.abertas.length === 1 ? "ação" : "ações"}</span></div>
+          ${c.abertas.length ? divisao(c) : '<div class="vazio">Nenhuma posição aberta.</div>'}
+        </section>
+        <div class="cart-botoes dupla"><button type="button" class="botao-vidro" data-abrir-op="venda"><i class="ti ti-arrow-down-right"></i>Venda</button><button type="button" class="botao-fogo" data-abrir-op="compra"><i class="ti ti-arrow-up-right"></i>Compra</button></div>
+      </aside>
+    </div>
 
-    <section class="painel s7">
-      <div class="painel-cabeca"><h2>Suas posições</h2>${c.abertas.length ? `<span class="extra">clique numa ação para ver a análise</span>` : ""}</div>
-      ${c.abertas.length ? `<div class="rolagem"><table><thead><tr><th>Ação</th><th class="n">Qtd.</th><th class="n esconde-celular">Preço médio</th><th class="n">Atual</th><th class="n">Resultado</th><th class="n esconde-celular">Peso</th></tr></thead><tbody>
-        ${[...c.abertas].sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1)).map((p) => {
-          const peso = p.valor != null && c.valor ? (p.valor / c.valor) * 100 : 0;
-          return `<tr data-href="#acao/${esc(p.papel)}"><td><div style="display:flex;align-items:center;gap:8px">${ativoCel(p.papel)}<span class="marca-saida" data-saida-marca="${esc(p.papel)}" hidden title="Uma regra de saída disparou"><i class="ti ti-bell-ringing"></i></span></div></td><td class="n">${num(p.qtd, 0)}</td>
-          <td class="n esconde-celular">${reais(p.pm)}</td><td class="n">${reais(p.preco)}</td>
-          <td class="n"><span class="${cls(p.resultado)}">${reais(p.resultado)}</span><br><span class="faint ${cls(p.resultado)}">${sinal(dif(p.valor, p.custo))}</span></td>
-          <td class="n esconde-celular"><div class="barra-fina" style="width:90px"><span style="width:${peso}%"></span></div>${num(peso, 0)}%</td></tr>`;
-        }).join("")}
-      </tbody></table></div>
-      ${c.semPreco.length ? `<p class="faint" style="margin-top:10px">Sem cotação, fora do patrimônio e da rentabilidade: ${c.semPreco.map(esc).join(", ")}.</p>` : ""}
+    ${c.abertas.length ? `<section class="painel">
+      <div class="painel-cabeca"><h2>Suas posições</h2><span class="extra">linha tracejada: seu preço médio</span></div>
+      <div class="pos-grade">${[...c.abertas].sort((a, b) => (b.valor ?? -1) - (a.valor ?? -1)).map((p) => cartaoPosicao(p, c)).join("")}</div>
+      ${c.semPreco.length ? `<p class="faint" style="margin-top:12px">Sem cotação, fora do patrimônio e da rentabilidade: ${c.semPreco.map(esc).join(", ")}.</p>` : ""}
       ${escala.length ? `<p class="faint" style="margin-top:10px">Escala de preço quebrada em ${escala.map(esc).join(", ")}: mínima, máxima e alerta de topo ficam desligados até a fonte corrigir a série.</p>` : ""}
-      ${suspeitas.length ? `<p class="faint" style="margin-top:10px">Cotação com salto de preço sem evento registrado em ${suspeitas.map(esc).join(", ")}: confira o preço na corretora e, se houve desdobramento ou grupamento, a quantidade. Os alertas continuam ativos, com esse aviso.</p>` : ""}
-      ${c.semHistorico.length ? `<p class="faint" style="margin-top:10px">Sem o histórico completo de desdobramentos e proventos de ${c.semHistorico.map(esc).join(", ")}: os números dessas ações podem estar errados até a próxima atualização.</p>` : ""}` : `<div class="vazio">Nenhuma posição ainda. Registre sua primeira compra ao lado. Dica: na tela de qualquer ação há o botão "Pôr na carteira".</div>`}
-      ${vendidoMes || dayMes ? `<p class="aviso-estudo" style="margin-top:14px"><i class="ti ti-receipt-tax"></i>${vendidoMes ? `Neste mês você vendeu ${reais(vendidoMes)} em ações, fora o day trade. ${vendidoMes > 20000 ? "Acima de R$ 20 mil em vendas no mês, o lucro com ações costuma pagar 15% de imposto de renda (DARF até o último dia útil do mês seguinte)." : "Até R$ 20 mil em vendas no mês, o lucro com ações costuma ser isento de imposto de renda."} ` : ""}${dayMes ? `Day trade (comprou e vendeu no mesmo dia) neste mês: ${reais(dayMes)} de volume. Esse lucro não entra na isenção de R$ 20 mil e costuma ser tributado a 20%.` : ""} Regras de imposto mudam; confirme com sua corretora ou um contador.</p>` : ""}
-    </section>
+      ${suspeitas.length ? `<p class="faint" style="margin-top:10px">Cotação com salto de preço sem evento registrado em ${suspeitas.map(esc).join(", ")}: confira o preço na corretora e, se houve desdobramento ou grupamento, a quantidade.</p>` : ""}
+      ${c.semHistorico.length ? `<p class="faint" style="margin-top:10px">Sem o histórico completo de desdobramentos e proventos de ${c.semHistorico.map(esc).join(", ")}: os números dessas ações podem estar errados até a próxima atualização.</p>` : ""}
+      ${vendidoMes || dayMes ? `<p class="aviso-estudo" style="margin:16px 0 0"><i class="ti ti-receipt-tax"></i><span>${vendidoMes ? `Neste mês você vendeu ${reais(vendidoMes)} em ações, fora o day trade. ${vendidoMes > 20000 ? "Acima de R$ 20 mil em vendas no mês, o lucro com ações costuma pagar 15% de imposto de renda (DARF até o último dia útil do mês seguinte)." : "Até R$ 20 mil em vendas no mês, o lucro com ações costuma ser isento de imposto de renda."} ` : ""}${dayMes ? `Day trade (comprou e vendeu no mesmo dia) neste mês: ${reais(dayMes)} de volume. Esse lucro não entra na isenção de R$ 20 mil e costuma ser tributado a 20%.` : ""} Regras de imposto mudam; confirme com sua corretora ou um contador.</span></p>` : ""}
+    </section>` : ""}
 
-    ${cart.lancamentos.length ? `<section class="painel">
-      <div class="painel-cabeca"><h2>Histórico de operações</h2><span class="extra">${cart.lancamentos.length} operações</span></div>
-      <div class="rolagem"><table><thead><tr><th>Data</th><th>Tipo</th><th>Ação</th><th class="n">Qtd.</th><th class="n">Preço</th><th class="n esconde-celular">Total</th><th></th></tr></thead><tbody>
-        ${[...cart.lancamentos].sort((a, b) => b.data.localeCompare(a.data) || b.criado - a.criado).map((l) => `<tr class="sem-link"><td>${dataBR(l.data)}</td>
-          <td><span class="pilula ${l.tipo === "compra" ? "pos" : "neg"}">${l.tipo}</span></td><td><b>${esc(l.papel)}</b></td><td class="n">${num(l.qtd, 0)}</td>
-          <td class="n">${reais(l.preco)}</td><td class="n esconde-celular">${reais(l.qtd * l.preco + (l.tipo === "compra" ? 1 : -1) * (l.taxas || 0))}</td>
-          <td class="n"><button type="button" class="apagar-op" data-id="${l.id}" aria-label="Apagar operação"><i class="ti ti-trash"></i></button></td></tr>`).join("")}
-      </tbody></table></div></section>` : ""}
+    ${c.abertas.length ? secaoSaidas() : ""}
+
+    <section class="painel historico">
+      <details>
+        <summary><h2>Histórico de operações</h2><span class="extra">${cart.lancamentos.length} ${cart.lancamentos.length === 1 ? "operação" : "operações"}</span><i class="ti ti-chevron-down"></i></summary>
+        <div class="rolagem" style="margin-top:14px"><table><thead><tr><th>Data</th><th>Tipo</th><th>Ação</th><th class="n">Qtd.</th><th class="n">Preço</th><th class="n esconde-celular">Total</th><th></th></tr></thead><tbody>
+          ${[...cart.lancamentos].sort((a, b) => b.data.localeCompare(a.data) || b.criado - a.criado).map((l) => `<tr class="sem-link"><td>${dataBR(l.data)}</td>
+            <td><span class="pilula ${l.tipo === "compra" ? "pos" : "neg"}">${l.tipo}</span></td><td><b>${esc(l.papel)}</b></td><td class="n">${num(l.qtd, 0)}</td>
+            <td class="n">${reais(l.preco)}</td><td class="n esconde-celular">${reais(l.qtd * l.preco + (l.tipo === "compra" ? 1 : -1) * (l.taxas || 0))}</td>
+            <td class="n"><button type="button" class="apagar-op" data-id="${l.id}" aria-label="Apagar operação"><i class="ti ti-trash"></i></button></td></tr>`).join("")}
+        </tbody></table></div>
+      </details>
+      <div class="acoes-carteira"><button class="botao contorno" type="button" id="exportar"><i class="ti ti-download"></i>Exportar</button>${importar}</div>
+    </section>`}
+    ${formulario}
     ${rodape()}`;
 
+  // Janela do formulário (folha que sobe no celular)
   let tipo = "compra";
-  ligarAbas(tela, "op", (t) => { tipo = t; });
+  const folha = $("#folha-op");
+  const marcarTipo = (t) => { tipo = t; $$("[data-op]", folha).forEach((b) => b.classList.toggle("ativo", b.dataset.op === t)); $("#titulo-op").textContent = t === "venda" ? "Registrar venda" : "Registrar compra"; };
+  const abrir = (t) => { marcarTipo(t); $("#erro-op").textContent = ""; folha.hidden = false; document.body.classList.add("com-folha"); setTimeout(() => $("#op-papel").focus(), 60); };
+  const fechar = () => { folha.hidden = true; document.body.classList.remove("com-folha"); };
+  $$("[data-abrir-op]").forEach((b) => b.onclick = () => abrir(b.dataset.abrirOp));
+  $("#fechar-op").onclick = fechar;
+  folha.onclick = (ev) => { if (ev.target === folha) fechar(); };
+  folha.onkeydown = (ev) => { if (ev.key === "Escape") fechar(); };
+  ligarAbas(folha, "op", marcarTipo);
+  if (pre) abrir("compra");
+
   const campoPapel = $("#op-papel"), campoPreco = $("#op-preco");
   const sugerirPreco = () => { const p = precoDe(campoPapel.value.trim().toUpperCase().replace(/F$/, "")); if (p && !campoPreco.value) campoPreco.value = p.toFixed(2); };
   campoPapel.addEventListener("change", sugerirPreco);
@@ -247,18 +422,20 @@ function telaCarteira() {
     cart.lancamentos.push({ id: crypto.randomUUID?.() || String(Date.now()), criado: Date.now(), tipo, papel: base, data, qtd, preco, taxas, estrategias });
     estado.saidasCache = null;
     if (!salvarCarteira(cart)) { $("#erro-op").textContent = "Este navegador não deixou salvar (modo anônimo?). Exporte para não perder."; return; }
+    document.body.classList.remove("com-folha");
     telaCarteira();
   };
   $$(".apagar-op").forEach((b) => b.onclick = () => {
     const restantes = cart.lancamentos.filter((l) => l.id !== b.dataset.id);
-    const antes = c.excesso;
-    if (calcularCarteira(restantes).excesso > antes) { alert("Não dá para apagar: uma venda depois dela ficaria sem ações. Apague ou corrija a venda primeiro."); return; }
+    if (calcularCarteira(restantes).excesso > c.excesso) { alert("Não dá para apagar: uma venda depois dela ficaria sem ações. Apague ou corrija a venda primeiro."); return; }
     if (!confirm("Apagar esta operação da carteira?")) return;
     cart.lancamentos = restantes;
+    estado.saidasCache = null;
     salvarCarteira(cart);
     telaCarteira();
   });
-  $("#exportar").onclick = () => {
+  const exportar = $("#exportar");
+  if (exportar) exportar.onclick = () => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(cart, null, 1)], { type: "application/json" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: `carteira-radar-${hojeISO()}.json` });
     a.click(); URL.revokeObjectURL(url);
@@ -270,10 +447,12 @@ function telaCarteira() {
       const sem = calcularCarteira(dado.lancamentos).excesso;   // vendas sem compra correspondente (dados antigos ou compra apagada)
       const aviso = sem ? `Atenção: ${num(sem, 0)} ações vendidas não têm compra correspondente no arquivo. O lucro dessas vendas fica de fora. ` : "";
       if (!confirm(`${aviso}Substituir a carteira atual pelas ${dado.lancamentos.length} operações do arquivo?`)) return;
+      estado.saidasCache = null;
       salvarCarteira(dado); telaCarteira();
     } catch { alert("Arquivo inválido: use um arquivo exportado pelo Radar B3."); }
   };
   ligarLinhas();
+  if (cart.lancamentos.length) montarGraficoCarteira(cart);
   if (c.abertas.length) montarSaidas(cart);
 }
 

@@ -831,7 +831,7 @@ function telaAlertas() {
   montarPush();
 }
 
-const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const ehIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 const instalado = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
 function chaveParaBytes(b64) {
   const s = atob((b64 + "=".repeat((4 - b64.length % 4) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
@@ -942,6 +942,38 @@ $("#alternar-menu").onclick = () => {
 
 // ---------- Início ----------
 window.addEventListener("hashchange", rotear);
+// ---------- Instalar como app (PWA) ----------
+// Android e computador: o navegador oferece a instalação. iPhone: só pelo menu Compartilhar do Safari.
+let pedidoInstalar = null;
+const fecharInstalar = (lembrar) => {
+  $("#instalar-app").hidden = true;
+  if (lembrar) try { localStorage.setItem("radar-instalar-fechado", String(Date.now())); } catch {}
+};
+function mostrarInstalar(forcar = false) {
+  if (instalado || (!pedidoInstalar && !ehIOS)) return;
+  $("#instalar-menu").hidden = false;
+  let fechado = 0;
+  try { fechado = Number(localStorage.getItem("radar-instalar-fechado")) || 0; } catch {}
+  if (!forcar && Date.now() - fechado < 14 * 864e5) return;   // "Agora não" vale por duas semanas
+  if (!pedidoInstalar) {
+    $("#instalar-dica").innerHTML = 'No iPhone, toque em <b>Compartilhar</b> <i class="ti ti-share-2"></i> e depois em <b>Adicionar à Tela de Início</b>. Ele abre em tela cheia e pode receber os alertas.';
+    $("#instalar-sim").textContent = "Entendi";
+  }
+  $("#instalar-app").hidden = false;
+}
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); pedidoInstalar = e; mostrarInstalar(); });
+window.addEventListener("appinstalled", () => { pedidoInstalar = null; fecharInstalar(false); $("#instalar-menu").hidden = true; });
+$("#instalar-sim").onclick = async () => {
+  if (!pedidoInstalar) return fecharInstalar(true);
+  pedidoInstalar.prompt();
+  const escolha = await pedidoInstalar.userChoice.catch(() => null);
+  pedidoInstalar = null;
+  fecharInstalar(escolha?.outcome !== "accepted");
+};
+$("#instalar-nao").onclick = () => fecharInstalar(true);
+$("#instalar-menu").onclick = () => mostrarInstalar(true);
+if (ehIOS) setTimeout(mostrarInstalar, 4000);   // no iPhone o navegador não avisa sozinho
+
 if ("serviceWorker" in navigator) {
   // Confere se saiu versão nova do app a cada 5 minutos; quando sai, a página se recarrega sozinha (sem F5).
   navigator.serviceWorker.register("sw.js").then((reg) => setInterval(() => reg.update().catch(() => {}), 5 * 60000)).catch(() => {});

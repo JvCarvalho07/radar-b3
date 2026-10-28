@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#140d0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Radar B3">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icones/icone-192.png">
   <link rel="apple-touch-icon" href="icones/icone-180.png">
@@ -37,6 +39,7 @@
         <a href="#alertas" data-aba="alertas" title="Alertas"><i class="ti ti-bell"></i><span>Alertas</span></a>
       </div>
       <div class="lateral-base">
+        <button type="button" class="instalar-menu" id="instalar-menu" title="Instalar o app" aria-label="Instalar o app" hidden><i class="ti ti-device-mobile-down"></i><span class="rotulo-menu">Instalar app</span></button>
         <div class="status-menu" id="status-menu"><span class="ponto"></span><span class="rotulo-menu" id="status-texto">Ao vivo</span></div>
         <button type="button" id="abrir-busca-trilho" title="Buscar ação (Ctrl K)" aria-label="Buscar ação"><i class="ti ti-search"></i><span class="rotulo-menu">Buscar</span></button>
         <button type="button" id="alternar-menu" title="Abrir ou fechar o menu" aria-label="Abrir ou fechar o menu" aria-expanded="false"><i class="ti ti-layout-sidebar-left-expand"></i><span class="rotulo-menu">Recolher menu</span></button>
@@ -45,6 +48,18 @@
 
     <main class="tela" id="conteudo"></main>
   </div>
+
+  <aside class="instalar-app" id="instalar-app" role="dialog" aria-labelledby="instalar-titulo" hidden>
+    <img src="icones/icone-192.png" alt="" width="48" height="48">
+    <div class="instalar-texto">
+      <b id="instalar-titulo">Instale o Radar B3</b>
+      <p id="instalar-dica">Ícone na tela inicial, abre em tela cheia como app e recebe os alertas. Grátis e sem loja.</p>
+    </div>
+    <div class="instalar-botoes">
+      <button type="button" class="botao-fogo" id="instalar-sim">Instalar</button>
+      <button type="button" class="instalar-nao" id="instalar-nao">Agora não</button>
+    </div>
+  </aside>
 
   <div class="paleta" id="paleta" hidden>
     <div class="paleta-caixa" role="dialog" aria-label="Buscar ação">

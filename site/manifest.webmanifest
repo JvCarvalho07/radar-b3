@@ -1,16 +1,25 @@
 {
+  "id": "./",
   "name": "Radar B3",
   "short_name": "Radar B3",
-  "description": "Triagem de ações da B3 com alertas.",
+  "description": "Ações da B3 com análise explicada, carteira e alertas.",
   "lang": "pt-BR",
-  "start_url": "./",
+  "dir": "ltr",
+  "start_url": "./#inicio",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#1a1a1d",
-  "theme_color": "#1a1a1d",
+  "background_color": "#130c09",
+  "theme_color": "#140d0a",
+  "categories": ["finance"],
   "icons": [
-    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/icone-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Carteira", "url": "./#carteira", "icons": [{ "src": "icones/icone-maskable-192.png", "sizes": "192x192" }] },
+    { "name": "Alertas", "url": "./#alertas", "icons": [{ "src": "icones/icone-maskable-192.png", "sizes": "192x192" }] },
+    { "name": "Estratégias", "url": "./#estrategias", "icons": [{ "src": "icones/icone-maskable-192.png", "sizes": "192x192" }] }
   ]
 }

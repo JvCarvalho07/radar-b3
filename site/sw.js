@@ -1,7 +1,7 @@
 // Service worker: funciona offline com o último dado visto e recebe as notificações push.
-const VERSAO = "radar-v14";
+const VERSAO = "radar-v15";
 const CASCA = ["./", "index.html", "estilo.css", "app.js", "rede.js", "globo.js", "mapa.js", "carteira.js", "config.js", "manifest.webmanifest",
-               "icones/icone-192.png", "icones/icone-512.png"];
+               "icones/icone-192.png", "icones/icone-512.png", "icones/icone-maskable-192.png", "icones/icone-180.png"];
 
 self.addEventListener("install", (ev) => {
   ev.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA)));
