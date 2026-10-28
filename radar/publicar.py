@@ -35,11 +35,16 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
     shutil.copytree(PASTA_SITE, saida)
     dados = saida / "dados"
 
+    # Série bruta para detectar salto e escala quebrada; a limpa para o resto (faixas, gráfico, precos/).
+    brutos = historicos
+    historicos = {p: v for p, v in ((p, analise.velas_validas(h)) for p, h in brutos.items()) if len(v)}
+
     _json(dados / "resultado.json", resultado)
     _json(dados / "historico.json", alertas.ler_historico())
     _json(dados / "mundo.json", fontes.baixar_mundo())
 
     perfis = fontes.baixar_perfis(historicos)
+    eventos = fontes.baixar_eventos(historicos)
     contagem = {}
     for est in resultado["estrategias"].values():
         for p in est["papeis"]:
@@ -49,15 +54,39 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
     for papel, linha in universo.iterrows():
         u = {c: _limpo(linha.get(c)) for c in CAMPOS_UNIVERSO if c in linha}
         if papel in historicos:
+            hist = historicos[papel]
             # Últimos ~3 meses de fechamento para os mini gráficos.
-            u["spark"] = [round(float(x), 2) for x in historicos[papel]["Close"].iloc[-63:]]
-            if "Dividends" in historicos[papel]:
-                # Proventos do último ano (data com e valor por ação), para a tela da ação e a carteira
-                div = historicos[papel]["Dividends"].fillna(0)
+            u["spark"] = [round(float(x), 2) for x in hist["Close"].iloc[-63:]]
+            if "Dividends" in hist:
+                # Proventos do último ano (data ex e valor por ação), para a tela da ação
+                div = hist["Dividends"].fillna(0)
                 u["proventos"] = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in div[div > 0].items()]
-            u.update(analise.faixas(historicos[papel]))
+            u.update(analise.faixas(hist))
+            if analise.suspeito(brutos[papel]):
+                # Salto de 2× sem explicação: aviso na carteira; nada é escondido.
+                u["dados_suspeitos"] = True
+            if analise.escala_quebrada(brutos[papel]):
+                # Barra fora de escala saiu da série: mínima, máxima e queda desde a máxima não são confiáveis.
+                u["escala_quebrada"] = True
+                for k in ("min_52s", "max_52s", "queda_52s"):
+                    u.pop(k, None)
+            ev = eventos.get(papel)
+            if ev is None:
+                # Sem histórico completo: proventos só do último ano e desdobramentos desconhecidos
+                u["eventos_incompletos"] = True
+                u["proventos_todos"] = u.get("proventos", [])
+            else:
+                u["proventos_todos"] = ev["proventos"]
+                if ev["desdobramentos"]:
+                    u["desdobramentos"] = ev["desdobramentos"]
+                # Resposta vazia do Yahoo não prova que não houve provento: o histórico de preço desmente.
+                if not ev["proventos"] and u.get("proventos"):
+                    u["proventos_todos"] = u["proventos"]
+                    u["eventos_incompletos"] = True
             u.update({k: _limpo(v) for k, v in perfis.get(papel, {}).items()})
             u.update(analise.preco_justo(u.get("cotacao"), u.get("pl"), u.get("pvp"), u.get("dy")))
+            if u.get("financeira"):
+                u.pop("graham", None)   # banco: Graham não se aplica, e some de todas as telas
             u["a_favor"], u["atencao"] = analise.sinais(u, contagem.get(papel, 0))
             u["pontos"] = analise.pontuacao(u["a_favor"], u["atencao"])
         tabela[papel] = u

@@ -9,6 +9,7 @@ on:
     branches: [main]
 
 permissions:
+  actions: write    # agendar a próxima rodada durante o pregão
   contents: write   # salvar o estado na branch "dados"
   pages: write
   id-token: write
@@ -78,3 +79,19 @@ jobs:
 
       - id: deploy
         uses: actions/deploy-pages@v4
+
+      # O agendamento do GitHub atrasa ou pula execuções. Durante o pregão, cada rodada chama a próxima;
+      # o "concurrency" acima garante uma só fila, e o cron continua de reserva para religar a cadeia.
+      - name: Agendar a próxima rodada (pregão)
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          dia=$(TZ=America/Sao_Paulo date +%u)
+          hora=$((10#$(TZ=America/Sao_Paulo date +%H%M)))
+          if [ "$dia" -le 5 ] && [ "$hora" -ge 955 ] && [ "$hora" -lt 1805 ]; then
+            sleep 150
+            gh workflow run radar.yml --repo "$GITHUB_REPOSITORY" --ref main
+          else
+            echo "Fora do pregão: a próxima rodada fica com o agendamento."
+          fi

@@ -22,11 +22,11 @@ def preco_justo(preco, pl, pvp, dy) -> dict:
     r = {}
     if _ok(preco) and _ok(pl) and _ok(pvp) and pl > 0 and pvp > 0:
         lpa, vpa = preco / pl, preco / pvp
-        r["lpa"], r["vpa"] = round(lpa, 2), round(vpa, 2)
+        r["lpa"], r["vpa"] = round(lpa, 4), round(vpa, 4)
         r["graham"] = round(math.sqrt(FATOR_GRAHAM * lpa * vpa), 2)
     if _ok(preco) and _ok(dy) and dy > 0:
         dpa = preco * dy / 100
-        r["dpa"] = round(dpa, 2)
+        r["dpa"] = round(dpa, 4)
         r["bazin"] = round(dpa / TAXA_BAZIN, 2)
     return r
 
@@ -53,12 +53,12 @@ def sinais(u: dict, n_estrategias: int) -> tuple[list[dict], list[dict]]:
     def pct(x):
         return f"{x:+.0f}%"
 
-    if _ok(u.get("graham")) and preco:
+    if not u.get("financeira") and _ok(u.get("graham")) and preco:   # Graham não se aplica a bancos
         dif = (u["graham"] / preco - 1) * 100
         if dif >= 10:
             a_favor.append({"t": "Abaixo do preço justo de Graham", "d": f"O preço justo calculado é R$ {u['graham']:.2f}, {pct(dif)} acima do preço atual."})
         elif dif <= -30:
-            atencao.append({"t": "Bem acima do preço justo de Graham", "d": f"O preço justo calculado é R$ {u['graham']:.2f}; o preço atual está {abs(dif):.0f}% acima dele."})
+            atencao.append({"t": "Bem acima do preço justo de Graham", "d": f"O preço justo calculado é R$ {u['graham']:.2f}; o preço atual está {(preco / u['graham'] - 1) * 100:.0f}% acima dele."})
     if _ok(u.get("bazin")) and preco:
         dif = (u["bazin"] / preco - 1) * 100
         if dif >= 0:
@@ -91,3 +91,37 @@ def sinais(u: dict, n_estrategias: int) -> tuple[list[dict], list[dict]]:
 def pontuacao(a_favor: list, atencao: list) -> int:
     """De 0 a 100: começa em 50, +10 por sinal a favor, −10 por sinal de atenção."""
     return max(0, min(100, 50 + 10 * len(a_favor) - 10 * len(atencao)))
+
+
+def velas_validas(hist: pd.DataFrame) -> pd.DataFrame:
+    """Open/High/Low zerados recebem o fechamento (o Yahoo às vezes entrega a vela do dia zerada).
+    Sai a barra fora de escala: preço acima de 20× ou abaixo de 1/20 da mediana local (21 pregões
+    centrados). Repete até não cair mais barra. A referência é local, para que um bloco de preços
+    quebrados no meio da série não contamine a escala do resto."""
+    h = hist.copy()
+    for col in ["Open", "High", "Low"]:
+        h[col] = h[col].where(h[col] > 0, h["Close"])
+    for _ in range(10):
+        fech = h["Close"].where(h["Close"] > 0)
+        med = fech.rolling(21, center=True, min_periods=1).median()
+        ok = (h["Close"] > 0) & (h["High"] <= 20 * med) & (h["Low"] >= med / 20)
+        if ok.all():
+            break
+        h = h[ok]
+    return h
+
+
+def escala_quebrada(hist: pd.DataFrame) -> bool:
+    """A limpeza tirou alguma barra com fechamento positivo (preço fora de escala). Fechamento zero
+    não conta: é dia sem negócio. Com isso, mínima, máxima e queda desde a máxima ficam de fora."""
+    return int((hist["Close"] > 0).sum()) > len(velas_validas(hist))
+
+
+def suspeito(hist: pd.DataFrame) -> bool:
+    """Salto de 2× ou mais, ou de metade ou menos, entre dois pregões seguidos. Não remove nada:
+    só marca `dados_suspeitos`, que pede para conferir a cotação."""
+    def tem_salto(c: pd.Series) -> bool:
+        c = c[c > 0]
+        r = c / c.shift(1)
+        return bool(((r >= 2) | (r <= 0.5)).any())
+    return tem_salto(hist["Close"]) or tem_salto(velas_validas(hist)["Close"])

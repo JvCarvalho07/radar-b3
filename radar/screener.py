@@ -8,7 +8,16 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import yaml
 
-from . import fontes
+from . import analise, fontes
+
+
+def _metricas(h: pd.DataFrame) -> dict:
+    """Métricas de preço sobre a série limpa. Com escala quebrada, a queda desde a máxima não é confiável."""
+    v = analise.velas_validas(h)
+    m = fontes.metricas_de_preco(v) if len(v) else {}
+    if m and analise.escala_quebrada(h):
+        m["queda_52s"] = float("nan")
+    return m
 
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA_DADOS = RAIZ / "dados"
@@ -104,7 +113,7 @@ def rodar(config: dict | None = None) -> tuple[dict, pd.DataFrame, dict]:
     if candidatos and not historicos:
         raise RuntimeError("O Yahoo Finance não devolveu preços. Tente de novo em alguns minutos.")
     metricas = pd.DataFrame(
-        {p: fontes.metricas_de_preco(h) for p, h in historicos.items()}
+        {p: _metricas(h) for p, h in historicos.items()}
     ).T
     for col in metricas.columns.drop("data_preco", errors="ignore"):
         metricas[col] = pd.to_numeric(metricas[col], errors="coerce")
@@ -136,7 +145,7 @@ def rodar(config: dict | None = None) -> tuple[dict, pd.DataFrame, dict]:
     watch = []
     for w in watchlist:
         papel = w["papel"].upper()
-        m = fontes.metricas_de_preco(historicos[papel]) if papel in historicos else {}
+        m = _metricas(historicos[papel]) if papel in historicos else {}
         watch.append({
             "papel": papel, "abaixo_de": w.get("abaixo_de"), "acima_de": w.get("acima_de"),
             **{k: (_float(v) if not isinstance(v, str) else v) for k, v in m.items()},

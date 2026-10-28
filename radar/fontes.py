@@ -172,6 +172,57 @@ def baixar_perfis(papeis) -> dict[str, dict]:
     return {p: cache.get(p, {}) for p in papeis}
 
 
+def baixar_eventos(papeis) -> dict:
+    """Proventos e desdobramentos de todo o histórico do Yahoo (não só o último ano). Cache do dia.
+
+    Devolve {papel: {"proventos": [[data ex, valor]], "desdobramentos": [[data, fator]]}}, ou None se o
+    Yahoo falhou para aquele papel. Uma falha fica marcada no cache e só é tentada de novo depois de 30 min.
+    Fator: 2 para 2:1; 0,1 para 1:10 (grupamento); 1,1 para bonificação de 10%.
+    O Yahoo ajusta os proventos anteriores a um desdobramento; a carteira leva isso em conta.
+    """
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    arq = _cache("eventos")
+    cache = _ler_cache(arq) or {}
+    agora = time.time()
+
+    def falhou(papel):
+        v = cache.get(papel)
+        return isinstance(v, dict) and "falha" in v
+
+    faltando = sorted(p for p in set(papeis)
+                      if p not in cache or (falhou(p) and agora - cache[p]["falha"] > 30 * 60))
+
+    def um(papel):
+        try:
+            # O histórico inteiro traz preços e eventos juntos. Sem preço nenhum, foi falha do Yahoo
+            # (ele devolve vazio em vez de erro), não "ação sem eventos".
+            acoes = yf.Ticker(f"{papel}.SA").history(period="max", auto_adjust=False, actions=True)
+            if acoes is None or acoes.empty or acoes["Close"].dropna().empty:
+                return papel, None
+            acoes = acoes.copy()
+            acoes.index = pd.to_datetime(acoes.index).tz_localize(None).normalize()
+            div = acoes["Dividends"].fillna(0) if "Dividends" in acoes else pd.Series(dtype=float)
+            div = div[div.index >= acoes.index[-1] - pd.DateOffset(years=10)]   # 10 anos: o app baixa isso a cada minuto
+            sp = acoes["Stock Splits"].fillna(0) if "Stock Splits" in acoes else pd.Series(dtype=float)
+            return papel, {
+                "proventos": [[d.strftime("%Y-%m-%d"), round(float(v), 6)] for d, v in div[div > 0].items()],
+                "desdobramentos": [[d.strftime("%Y-%m-%d"), round(float(v), 6)] for d, v in sp[(sp > 0) & (sp != 1)].items()],
+            }
+        except Exception as erro:  # sem cobertura, limite de acesso etc.
+            log.info("Sem eventos para %s: %s", papel, erro)
+            return papel, None
+
+    if faltando:
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            novos = dict(pool.map(um, faltando))
+        for papel, v in novos.items():
+            cache[papel] = v if v is not None else {"falha": agora}
+        arq.write_bytes(pickle.dumps(cache))
+    return {p: (None if falhou(p) else cache.get(p)) for p in papeis}
+
+
 def metricas_de_preco(hist: pd.DataFrame) -> dict:
     """Queda desde a máxima de 52 semanas e variações recentes, em %."""
     fech = hist["Close"]
@@ -201,7 +252,7 @@ def resumo_mercado() -> dict:
     fech = None
     for _ in range(2):  # o Yahoo às vezes devolve vazio; uma segunda tentativa costuma resolver
         try:
-            fech = yf.Ticker("^BVSP").history(period="1y")["Close"].dropna()
+            fech = yf.Ticker("^BVSP").history(period="5y")["Close"].dropna()
             if len(fech) > 1:
                 arq_ibov.write_bytes(pickle.dumps(fech))
                 break
@@ -211,12 +262,15 @@ def resumo_mercado() -> dict:
     if fech is None:
         fech = _ler_cache(arq_ibov)  # último valor bom do dia
     try:
+        um_ano = fech.index >= fech.index[-1] - pd.DateOffset(years=1)
         resultado["ibovespa"] = {
             "valor": float(fech.iloc[-1]),
             "var_dia": (float(fech.iloc[-1]) / float(fech.iloc[-2]) - 1) * 100,
             "data": fech.index[-1].strftime("%Y-%m-%d"),
-            # Série diária de 1 ano para o gráfico principal do app.
-            "serie": [[d.strftime("%Y-%m-%d"), round(float(v))] for d, v in fech.items()],
+            # "serie": índice de preço, último ano, para o gráfico da home.
+            "serie": [[d.strftime("%Y-%m-%d"), round(float(v))] for d, v in fech[um_ano].items()],
+            # "serie_total": retorno total (BOVA11 com proventos), 5 anos, para comparar com a carteira.
+            "serie_total": _estender(serie_bova11(), fech),
         }
     except Exception as erro:
         log.warning("Falha ao obter Ibovespa: %s", erro)
@@ -239,6 +293,40 @@ def resumo_mercado() -> dict:
         except Exception as erro:
             log.warning("Falha na série do dólar: %s", erro)
     return resultado
+
+
+def serie_bova11():
+    """BOVA11 ajustado por proventos (retorno total do Ibovespa), 5 anos. Cache do dia; None se falhar."""
+    arq = _cache("bova11")
+    em_cache = _ler_cache(arq)
+    if em_cache:
+        return em_cache
+    try:
+        # auto_adjust (padrão do yfinance) desconta os proventos: a série mede o retorno total
+        bova = yf.Ticker("BOVA11.SA").history(period="5y")["Close"].dropna()
+        hoje = f"{date.today():%Y-%m-%d}"   # o pregão de hoje ainda muda; entra depois pelo Ibovespa
+        serie = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in bova.items() if d.strftime("%Y-%m-%d") < hoje]
+    except Exception as erro:
+        log.warning("Falha ao obter BOVA11: %s", erro)
+        return None
+    if len(serie) > 1:
+        arq.write_bytes(pickle.dumps(serie))
+        return serie
+    return None
+
+
+def _estender(serie, fech):
+    """O BOVA11 vem do cache do dia, só com pregões fechados; os pregões seguintes andam junto com o Ibovespa."""
+    if not serie:
+        return serie
+    serie = [list(x) for x in serie]
+    datas = [d.strftime("%Y-%m-%d") for d in fech.index]
+    valores = [float(v) for v in fech.values]
+    ult = serie[-1][0]
+    for i in range(1, len(datas)):
+        if datas[i] > ult and datas[i - 1] >= ult:
+            serie.append([datas[i], round(serie[-1][1] * valores[i] / valores[i - 1], 4)])
+    return serie
 
 
 def serie_dolar() -> list:

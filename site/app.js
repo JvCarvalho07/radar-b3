@@ -613,9 +613,9 @@ async function telaAcao(arg) {
         const na = u.financeira && NAO_SE_APLICA_FIN.has(c);
         return `<tr><td>${ROTULOS[c]}</td><td class="n">${na ? '<span class="faint">não se aplica</span>' : u[c] == null ? "—" : num(u[c], PCT.has(c) ? 1 : 2) + (PCT.has(c) ? "%" : "")}</td></tr>`;
       }).join("")}
-      <tr><td>Lucro por ação (LPA)</td><td class="n">${u.lpa == null ? "—" : reais(u.lpa)}</td></tr>
-      <tr><td>Patrimônio por ação (VPA)</td><td class="n">${u.vpa == null ? "—" : reais(u.vpa)}</td></tr>
-      <tr><td>Dividendo por ação, 12 meses</td><td class="n">${u.dpa == null ? "—" : reais(u.dpa)}</td></tr>
+      <tr><td>Lucro por ação (LPA)</td><td class="n">${u.lpa == null ? "—" : reais(u.lpa, 4)}</td></tr>
+      <tr><td>Patrimônio por ação (VPA)</td><td class="n">${u.vpa == null ? "—" : reais(u.vpa, 4)}</td></tr>
+      <tr><td>Dividendo por ação, 12 meses</td><td class="n">${u.dpa == null ? "—" : reais(u.dpa, 4)}</td></tr>
       <tr><td>Volume médio por dia</td><td class="n">R$ ${num((u.liq_2meses || 0) / 1e6, 1)} mi</td></tr>
       <tr><td>Estratégias em que passa</td><td class="n">${em.length ? esc(em.map(([, e]) => e.nome).join(", ")) : "nenhuma"}</td></tr></tbody></table></div>
     </section>
@@ -707,17 +707,17 @@ function tabelaRegua(u, preco, temA) {
 function comoCalculado(u, preco, temA) {
   const itens = [];
   if (u.graham) itens.push(`<div class="conta-item"><b>Preço justo de Graham</b>
-    <p><code>√(22,5 × LPA ${num(u.lpa)} × VPA ${num(u.vpa)}) = ${reais(u.graham)}</code></p>
+    <p><code>√(22,5 × LPA ${num(u.lpa, 4)} × VPA ${num(u.vpa, 4)}) = ${reais(u.graham)}</code></p>
     <p>LPA é o lucro por ação dos últimos 12 meses e VPA, o patrimônio por ação. O 22,5 vem dos limites de Benjamin Graham: pagar até 15 vezes o lucro e 1,5 vez o patrimônio. Funciona mal para empresas de lucro irregular.</p></div>`);
   if (u.bazin) itens.push(`<div class="conta-item"><b>Preço-teto de Bazin</b>
-    <p><code>dividendo por ação ${num(u.dpa)} ÷ 6% = ${reais(u.bazin)}</code></p>
+    <p><code>dividendo por ação ${num(u.dpa, 4)} ÷ 6% = ${reais(u.bazin)}</code></p>
     <p>Usa os dividendos dos últimos 12 meses (yield de ${num(u.dy, 1)}%). Décio Bazin só comprava quando o dividendo rendia pelo menos 6% ao ano. Dividendos passados não garantem os futuros.</p></div>`);
   if (u.faixa_1m) itens.push(`<div class="conta-item"><b>Faixa provável em 1 mês</b>
     <p><code>${num(preco)} × e^(±σ × √21) = ${num(u.faixa_1m[0])} a ${num(u.faixa_1m[1])}</code></p>
     <p>σ é a oscilação diária dos últimos 6 meses (${num(u.vol_anual, 1)}% ao ano). É uma estimativa de quanto o preço costuma variar, não de para onde ele vai: em cerca de 2 de cada 3 meses, o preço termina dentro dela.</p></div>`);
   if (temA) itens.push(`<div class="conta-item"><b>Alvo dos analistas</b>
     <p>Média das projeções de ${u.analistas} analistas de bancos e corretoras para os próximos 12 meses, segundo o Yahoo Finance. Analistas também erram e revisam os alvos com frequência.</p></div>`);
-  itens.push(`<div class="conta-item"><b>Leitura do Radar</b><p>Conta sinais com regras fixas: preço abaixo de Graham (10% ou mais) ou de Bazin, ROE acima de 15%, dívida até 0,5× o patrimônio e alvo dos analistas 10% acima contam a favor. Prejuízo, ROE abaixo de 8%, dívida acima de 2×, queda de 15% no mês ou alvo abaixo do preço pedem atenção. A pontuação começa em 50, soma 10 por sinal a favor e tira 10 por sinal de atenção, de 0 a 100.</p></div>`);
+  itens.push(`<div class="conta-item"><b>Leitura do Radar</b><p>Conta sinais com regras fixas: preço abaixo de Graham (10% ou mais) ou de Bazin, ROE acima de 15%, dívida até 0,5× o patrimônio e alvo dos analistas 10% acima contam a favor. Prejuízo, ROE abaixo de 8%, dívida acima de 2×, queda de 15% no mês ou alvo mais de 5% abaixo do preço pedem atenção. A pontuação começa em 50, soma 10 por sinal a favor e tira 10 por sinal de atenção, de 0 a 100.</p></div>`);
   return itens.join("");
 }
 
