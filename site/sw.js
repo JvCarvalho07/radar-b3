@@ -1,10 +1,13 @@
 // Service worker: funciona offline com o último dado visto e recebe as notificações push.
-const VERSAO = "radar-v15";
+// Na publicação, o publicar.py troca este nome por um resumo dos arquivos do app: qualquer mudança no código
+// muda o sw.js, e o app instalado se atualiza sozinho (não precisa reinstalar nem apertar F5).
+const VERSAO = "radar-v16";
 const CASCA = ["./", "index.html", "estilo.css", "app.js", "rede.js", "globo.js", "mapa.js", "carteira.js", "config.js", "manifest.webmanifest",
                "icones/icone-192.png", "icones/icone-512.png", "icones/icone-maskable-192.png", "icones/icone-180.png"];
 
 self.addEventListener("install", (ev) => {
-  ev.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA)));
+  // "reload" busca direto do servidor, sem pegar cópia velha guardada pelo navegador
+  ev.waitUntil(caches.open(VERSAO).then((c) => c.addAll(CASCA.map((u) => new Request(u, { cache: "reload" })))));
   self.skipWaiting();
 });
 
@@ -26,7 +29,9 @@ self.addEventListener("fetch", (ev) => {
     return;
   }
   // Casca do app e biblioteca de gráficos: rede primeiro também, para pegar atualizações.
-  ev.respondWith(fetch(ev.request).then((resp) => {
+  // Arquivos do próprio app: "no-cache" confere com o servidor (o GitHub deixa o navegador guardar por 10 min).
+  const daRede = url.origin === self.location.origin ? fetch(ev.request.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(ev.request);
+  ev.respondWith(daRede.then((resp) => {
     if (resp.ok) { const copia = resp.clone(); caches.open(VERSAO).then((c) => c.put(ev.request, copia)); }
     return resp;
   }).catch(() => caches.match(ev.request, { ignoreSearch: true })));

@@ -975,12 +975,18 @@ $("#instalar-menu").onclick = () => mostrarInstalar(true);
 if (ehIOS) setTimeout(mostrarInstalar, 4000);   // no iPhone o navegador não avisa sozinho
 
 if ("serviceWorker" in navigator) {
-  // Confere se saiu versão nova do app a cada 5 minutos; quando sai, a página se recarrega sozinha (sem F5).
-  navigator.serviceWorker.register("sw.js").then((reg) => setInterval(() => reg.update().catch(() => {}), 5 * 60000)).catch(() => {});
+  // Confere se saiu versão nova do app a cada 5 minutos e sempre que o app volta para a frente
+  // (no celular o app instalado fica parado em segundo plano); quando sai, a página se recarrega sozinha.
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => {
+    const conferir = () => reg.update().catch(() => {});
+    setInterval(conferir, 5 * 60000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) conferir(); });
+  }).catch(() => {});
   let jaTinha = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!jaTinha) { jaTinha = true; return; }   // primeira instalação, não é versão nova
-    const digitando = () => document.activeElement?.matches?.("input, textarea, select");
+    // Espera se a pessoa estiver digitando ou com o formulário da carteira aberto
+    const digitando = () => document.activeElement?.matches?.("input, textarea, select") || document.body.classList.contains("com-folha");
     const recarregar = () => { if (digitando()) setTimeout(recarregar, 3000); else location.reload(); };
     recarregar();
   });

@@ -1,7 +1,9 @@
 """Monta a pasta do site (app + dados em JSON) que vai para o GitHub Pages."""
 
+import hashlib
 import json
 import math
+import re
 import shutil
 from pathlib import Path
 
@@ -29,10 +31,24 @@ def _json(caminho: Path, dados):
     caminho.write_text(json.dumps(dados, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
+def _carimbar_versao(saida: Path):
+    """O app instalado só percebe versão nova quando o sw.js muda. Carimba nele um resumo dos arquivos
+    do app: mudou qualquer arquivo, muda o carimbo e o app se atualiza sozinho. Só dados novos não mudam."""
+    resumo = hashlib.sha1()
+    for f in sorted(p for p in PASTA_SITE.rglob("*") if p.is_file()):
+        resumo.update(f.relative_to(PASTA_SITE).as_posix().encode())
+        resumo.update(f.read_bytes())
+    sw = saida / "sw.js"
+    texto = sw.read_text(encoding="utf-8")
+    novo = re.sub(r'const VERSAO = "[^"]*";', f'const VERSAO = "radar-{resumo.hexdigest()[:12]}";', texto, count=1)
+    sw.write_text(novo, encoding="utf-8")
+
+
 def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path):
     if saida.exists():
         shutil.rmtree(saida)
     shutil.copytree(PASTA_SITE, saida)
+    _carimbar_versao(saida)
     dados = saida / "dados"
 
     # Série bruta para detectar salto e escala quebrada; a limpa para o resto (faixas, gráfico, precos/).
