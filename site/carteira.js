@@ -79,6 +79,7 @@ function telaCarteira() {
       <div><span>Lucro com vendas</span><b class="${cls(c.realizado)}">${reais(c.realizado)}</b><em class="faint">já realizado</em></div>
       <div><span>Você × Ibovespa</span><b class="${cls(rent)}">${sinal(rent, 1)}</b><em class="faint">${ibov ? `Ibovespa ${sinal(ibov.v, 1)} desde ${dataBR(ibov.desde)}` : "sem dados do período"}</em></div>
     </section>` : ""}
+    ${c.abertas.length ? secaoSaidas() : ""}
 
     <section class="painel s5" id="form-carteira">
       <div class="painel-cabeca"><h2>Registrar operação</h2></div>
@@ -106,7 +107,7 @@ function telaCarteira() {
     <section class="painel s7">
       <div class="painel-cabeca"><h2>Suas posições</h2>${c.abertas.length ? `<span class="extra">clique numa ação para ver a análise</span>` : ""}</div>
       ${c.abertas.length ? `<div class="rolagem"><table><thead><tr><th>Ação</th><th class="n">Qtd.</th><th class="n esconde-celular">Preço médio</th><th class="n">Atual</th><th class="n">Resultado</th><th class="n esconde-celular">Peso</th></tr></thead><tbody>
-        ${[...c.abertas].sort((a, b) => b.valor - a.valor).map((p) => `<tr data-href="#acao/${esc(p.papel)}"><td>${ativoCel(p.papel)}</td><td class="n">${num(p.qtd, 0)}</td>
+        ${[...c.abertas].sort((a, b) => b.valor - a.valor).map((p) => `<tr data-href="#acao/${esc(p.papel)}"><td><div style="display:flex;align-items:center;gap:8px">${ativoCel(p.papel)}<span class="marca-saida" data-saida-marca="${esc(p.papel)}" hidden title="Uma regra de saída disparou"><i class="ti ti-bell-ringing"></i></span></div></td><td class="n">${num(p.qtd, 0)}</td>
           <td class="n esconde-celular">${reais(p.pm)}</td><td class="n">${reais(p.preco)}</td>
           <td class="n"><span class="${cls(p.resultado)}">${reais(p.resultado)}</span><br><span class="faint ${cls(p.resultado)}">${sinal(dif(p.valor, p.custo))}</span></td>
           <td class="n esconde-celular"><div class="barra-fina" style="width:90px"><span style="width:${c.valor ? (p.valor / c.valor) * 100 : 0}%"></span></div>${num(c.valor ? (p.valor / c.valor) * 100 : 0, 0)}%</td></tr>`).join("")}
@@ -147,7 +148,11 @@ function telaCarteira() {
     }
     if (erro) { $("#erro-op").textContent = erro; return; }
     // Fracionário (PETR4F) é a mesma ação da posição PETR4
-    cart.lancamentos.push({ id: crypto.randomUUID?.() || String(Date.now()), criado: Date.now(), tipo, papel: papel.replace(/F$/, ""), data, qtd, preco, taxas });
+    // Guarda em quais estratégias a ação estava no dia da compra (para a regra "saiu da estratégia")
+    const base = papel.replace(/F$/, "");
+    const estrategias = tipo === "compra" ? Object.entries(estado.resultado.estrategias).filter(([, e]) => e.papeis.some((x) => x.papel === base)).map(([k]) => k) : [];
+    cart.lancamentos.push({ id: crypto.randomUUID?.() || String(Date.now()), criado: Date.now(), tipo, papel: base, data, qtd, preco, taxas, estrategias });
+    estado.saidasCache = null;
     if (!salvarCarteira(cart)) { $("#erro-op").textContent = "Este navegador não deixou salvar (modo anônimo?). Exporte para não perder."; return; }
     telaCarteira();
   };
@@ -171,4 +176,109 @@ function telaCarteira() {
     } catch { alert("Arquivo inválido: use um arquivo exportado pelo Radar B3."); }
   };
   ligarLinhas();
+  if (c.abertas.length) montarSaidas(cart);
+}
+
+// ---------- Regras de saída ----------
+// A pessoa define as regras uma vez; o app confere cada posição sempre que é aberto.
+// Elas não mandam vender: avisam que chegou a hora de reavaliar, com o motivo na tela.
+const SAIDA_PADRAO = { estrategia: true, alvo: true, graham: true, quedaTopo: 15, quedaPM: 20, pesoMax: 25 };
+const configSaida = (cart) => ({ ...SAIDA_PADRAO, ...(cart.saida || {}) });
+
+// Maior fechamento desde a primeira compra (para "caiu X% do topo")
+async function topoDesde(papel, data) {
+  try {
+    const velas = await carregarJSON(`dados/precos/${papel}.json`);
+    const desde = velas.filter((v) => v[0] >= data);
+    return desde.length ? Math.max(...desde.map((v) => v[4])) : null;
+  } catch { return null; }
+}
+
+// Lista os alertas de cada posição aberta. Sem `comTopo`, pula a regra que precisa baixar o histórico.
+async function avaliarSaidas(cart, comTopo = true) {
+  const cfg = configSaida(cart), c = calcularCarteira(cart.lancamentos), alertas = [];
+  for (const p of c.abertas) {
+    const u = estado.universo[p.papel] || {}, preco = p.preco;
+    if (preco == null) continue;
+    const add = (regra, t, d) => alertas.push({ papel: p.papel, regra, t, d, chave: `${p.papel}:${regra}` });
+    const compras = cart.lancamentos.filter((l) => l.papel === p.papel && l.tipo === "compra");
+    const ests = [...new Set(compras.flatMap((l) => l.estrategias || []))];
+    if (cfg.estrategia && ests.length) {
+      const ainda = ests.filter((k) => estado.resultado.estrategias[k]?.papeis.some((x) => x.papel === p.papel));
+      if (!ainda.length) add("estrategia", "Saiu da estratégia em que você comprou",
+        `Quando você comprou, ${p.papel} estava em ${ests.map((k) => estado.resultado.estrategias[k]?.nome || k).join(", ")}. Hoje não cumpre mais os critérios. Vale rever se o motivo da compra ainda vale.`);
+    }
+    if (cfg.alvo && u.alvo_medio && (u.analistas || 0) >= 3 && preco >= u.alvo_medio)
+      add("alvo", "Chegou ao alvo dos analistas", `O preço (${reais(preco)}) alcançou o alvo médio de ${u.analistas} analistas (${reais(u.alvo_medio)}). O espaço de alta que eles enxergavam acabou.`);
+    if (cfg.graham && u.graham && !u.financeira && preco >= u.graham)
+      add("graham", "Passou do preço justo de Graham", `O preço (${reais(preco)}) está acima do preço justo pela fórmula de Graham (${reais(u.graham)}).`);
+    if (cfg.quedaPM && p.pm && preco <= p.pm * (1 - cfg.quedaPM / 100))
+      add("quedaPM", `Caiu mais de ${cfg.quedaPM}% do seu preço médio`, `Preço médio ${reais(p.pm)}, hoje ${reais(preco)} (${sinal(dif(preco, p.pm))}). É o limite de perda que você definiu.`);
+    if (cfg.pesoMax && c.valor && (p.valor / c.valor) * 100 > cfg.pesoMax && c.abertas.length > 100 / cfg.pesoMax) // com poucas ações, todas passam do limite
+      add("peso", `Pesa mais de ${cfg.pesoMax}% da carteira`, `${p.papel} é ${num((p.valor / c.valor) * 100, 0)}% do seu patrimônio. Concentração alta aumenta o risco se algo der errado com essa empresa.`);
+    if (comTopo && cfg.quedaTopo) {
+      const primeira = compras.map((l) => l.data).sort()[0], topo = await topoDesde(p.papel, primeira);
+      if (topo && preco <= topo * (1 - cfg.quedaTopo / 100))
+        add("quedaTopo", `Caiu mais de ${cfg.quedaTopo}% do topo desde a compra`, `O maior preço desde ${dataBR(primeira)} foi ${reais(topo)}; hoje está em ${reais(preco)} (${sinal(dif(preco, topo))}).`);
+    }
+  }
+  return alertas;
+}
+
+// Notificação do navegador só para alertas que a pessoa ainda não viu
+async function notificarNovos(alertas) {
+  let vistos = [];
+  try { vistos = JSON.parse(localStorage.getItem("radar-saidas-vistas") || "[]"); } catch {}
+  const novos = alertas.filter((a) => !vistos.includes(a.chave));
+  try { localStorage.setItem("radar-saidas-vistas", JSON.stringify(alertas.map((a) => a.chave))); } catch {}
+  if (!novos.length || !("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const titulo = novos.length === 1 ? `${novos[0].papel}: ${novos[0].t}` : `${novos.length} alertas de saída na sua carteira`;
+    reg?.showNotification(titulo, { body: novos.map((a) => `${a.papel}: ${a.t}`).join("\n"), icon: "icones/icone-192.png", data: { url: "./#carteira" } });
+  } catch {}
+}
+
+async function montarSaidas(cart) {
+  const caixa = $("#saidas");
+  if (!caixa) return;
+  const cfg = configSaida(cart);
+  for (const k of ["estrategia", "alvo", "graham"]) $(`#s-${k}`).checked = cfg[k];
+  $("#s-topo").value = cfg.quedaTopo; $("#s-pm").value = cfg.quedaPM; $("#s-peso").value = cfg.pesoMax;
+  $("#form-saida").onchange = () => {
+    cart.saida = {
+      estrategia: $("#s-estrategia").checked, alvo: $("#s-alvo").checked, graham: $("#s-graham").checked,
+      quedaTopo: Math.max(0, Number($("#s-topo").value) || 0), quedaPM: Math.max(0, Number($("#s-pm").value) || 0), pesoMax: Math.max(0, Number($("#s-peso").value) || 0),
+    };
+    salvarCarteira(cart);
+    estado.saidasCache = null;
+    montarSaidas(cart);
+  };
+  const alertas = await avaliarSaidas(cart);
+  if (!document.body.contains(caixa)) return;
+  estado.saidasCache = alertas.filter((a) => a.regra !== "quedaTopo").concat(alertas.filter((a) => a.regra === "quedaTopo"));
+  notificarNovos(alertas);
+  $("#lista-saidas").innerHTML = alertas.length ? alertas.map((a) => `<a class="alerta-saida" href="#acao/${esc(a.papel)}">${logo(a.papel)}
+      <div><b>${esc(a.papel)} · ${esc(a.t)}</b><p>${esc(a.d)}</p></div><i class="ti ti-chevron-right"></i></a>`).join("")
+    : `<div class="vazio">Nenhuma regra disparou. Suas posições estão dentro do que você definiu.</div>`;
+  $$("[data-saida-marca]").forEach((el) => { el.hidden = !alertas.some((a) => a.papel === el.dataset.saidaMarca); });
+}
+
+function secaoSaidas() {
+  return `<section class="painel" id="saidas">
+    <div class="painel-cabeca"><h2>Regras de saída</h2><span class="extra">não mandam vender: avisam a hora de reavaliar</span></div>
+    <div class="saidas-grade">
+      <div id="lista-saidas"><div class="carregando"></div></div>
+      <form class="form-saida" id="form-saida">
+        <h3>Me avise quando uma ação da carteira…</h3>
+        <label class="marcar"><input type="checkbox" id="s-estrategia">sair da estratégia em que eu comprei</label>
+        <label class="marcar"><input type="checkbox" id="s-alvo">chegar ao alvo médio dos analistas</label>
+        <label class="marcar"><input type="checkbox" id="s-graham">passar do preço justo de Graham</label>
+        <label class="numero">cair mais de <input type="number" id="s-topo" min="0" max="90" step="1" aria-label="Percentual de queda desde o topo">% do topo desde a compra</label>
+        <label class="numero">cair mais de <input type="number" id="s-pm" min="0" max="90" step="1" aria-label="Percentual abaixo do preço médio">% do meu preço médio</label>
+        <label class="numero">passar de <input type="number" id="s-peso" min="0" max="100" step="1" aria-label="Peso máximo na carteira">% do meu patrimônio</label>
+        <p class="faint">Use 0 para desligar uma regra numérica. Os alertas aparecem quando você abre o app; as notificações do navegador, se você permitiu.</p>
+      </form>
+    </div>
+  </section>`;
 }

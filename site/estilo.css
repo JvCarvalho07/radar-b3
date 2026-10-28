@@ -666,3 +666,17 @@ tr.sem-link { cursor: default; }
 .form-op input { width: 100%; min-width: 0; box-sizing: border-box; }
 .form-linha > label { min-width: 0; }
 @media (max-width: 400px) { .form-linha { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Regras de saída ---------- */
+.saidas-grade { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+.alerta-saida { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px; margin-bottom: 8px; border-radius: 16px; background: linear-gradient(90deg, rgba(255, 107, 94, .14), rgba(255, 107, 94, .03)); border: 1px solid rgba(255, 107, 94, .25); }
+.alerta-saida b { font-weight: 700; }
+.alerta-saida p { color: var(--muted); font-size: 13px; line-height: 19px; margin-top: 2px; }
+.alerta-saida .ti { color: var(--faint); }
+.form-saida { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: var(--fundo-campo); }
+.form-saida h3 { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.form-saida label { font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.form-saida input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--laranja); }
+.form-saida input[type=number] { width: 64px; height: 34px; padding: 0 8px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid var(--linha-2); color: var(--texto); font: 600 14px var(--font); text-align: center; }
+.marca-saida { color: var(--neg); font-size: 16px; }
+@media (max-width: 900px) { .saidas-grade { grid-template-columns: minmax(0, 1fr); } }

@@ -299,6 +299,7 @@ function linhaOlhar(p, extra) {
 // e ações da watchlist que se mexeram muito hoje.
 function pedeAtencao() {
   const itens = [];
+  for (const a of estado.saidasCache || []) itens.push({ p: a.papel, t: a.t, d: "Regra de saída da sua carteira", tipo: "neg" });
   for (const w of estado.resultado.watchlist) {
     if (w.preco == null) continue;
     if (w.abaixo_de && w.preco <= w.abaixo_de) itens.push({ p: w.papel, t: `Abaixo de ${reais(w.abaixo_de)}`, d: "Seu alerta de preço disparou", tipo: "neg" });
@@ -403,6 +404,13 @@ function telaInicio() {
     ${rodape()}`;
 
   montarPilha(0);
+  // Regras de saída da carteira (as que não precisam baixar histórico) entram no "Pede sua atenção"
+  if (!estado.saidasCache && typeof avaliarSaidas === "function" && lerCarteira().lancamentos.length) {
+    avaliarSaidas(lerCarteira(), false).then((al) => {
+      estado.saidasCache = al;
+      if (al.length && estado.rotaAtual === "#inicio") { const y = window.scrollY; telaInicio(); window.scrollTo({ top: y, behavior: "instant" }); }
+    });
+  }
   ligarAbas($("#potencial"), "pot", (k) => $$("[data-painel-pot]").forEach((el) => { el.hidden = el.dataset.painelPot !== k; }));
   montarMapa($("#slot-mapa"));
   montarGlobo($("#slot-rede"));
