@@ -292,6 +292,11 @@ th.ord:hover, th.ord.on { color: var(--texto); }
 .globo .pais.com-dado { stroke: rgba(255, 244, 236, .25); stroke-width: .7; }
 .globo .pais.brasil { stroke: #ffb057; stroke-width: 1.6; }
 .globo .pais.realce, .globo .pais:hover { stroke: #fff; stroke-width: 1.8; }
+.rotulos-globo { pointer-events: none; }
+.rotulos-globo text { text-anchor: middle; paint-order: stroke; stroke: rgba(14, 8, 5, .85); stroke-width: 3.5px; stroke-linejoin: round; }
+.rotulos-globo .r1 { fill: #fff; font: 700 12.5px var(--font); }
+.rotulos-globo .r2 { font: 700 11.5px var(--font); }
+.rotulos-globo .r2.sobe { fill: #8ff0c0; } .rotulos-globo .r2.desce { fill: #ff9a8f; }
 .dica-globo { position: absolute; z-index: 5; pointer-events: none; padding: 9px 13px; border-radius: 13px; background: #fff; color: #1d120c; font-size: 12.5px; line-height: 17px; white-space: nowrap; box-shadow: 0 14px 34px rgba(0, 0, 0, .35); transform: translate(-50%, calc(-100% - 14px)); opacity: 0; transition: opacity .12s; }
 .dica-globo b { display: block; }
 .dica-globo.on { opacity: 1; }
@@ -431,3 +436,16 @@ pre.exemplo code { font: 13px/20px ui-monospace, Consolas, monospace; color: var
   .botao.branco, .botao.vazado { flex: 1; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+
+/* Seletor do gráfico do topo: Ibovespa, Dólar ou uma ação da watchlist */
+.seletor-topo { display: flex; gap: 6px; margin: -4px 0 14px; overflow-x: auto; scrollbar-width: none; }
+.seletor-topo::-webkit-scrollbar { display: none; }
+.seletor-topo button { height: 32px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); background: rgba(255, 244, 236, .05); border: 1px solid var(--linha); white-space: nowrap; transition: background .2s, color .2s; }
+.seletor-topo button:hover { color: var(--texto); }
+.seletor-topo button.ativo { color: #2a0d00; background: var(--fogo); border-color: transparent; box-shadow: 0 8px 20px rgba(255, 110, 31, .3); }
+
+/* Lista completa de ações */
+.filtros-lista { display: flex; flex-direction: column; gap: 12px; }
+.campo-busca { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-radius: 16px; background: var(--fundo-campo); border: 1px solid var(--linha); color: var(--muted); }
+.campo-busca input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--texto); font: 500 15px var(--font); }
+.filtros-lista .pilulas { flex-wrap: nowrap; }

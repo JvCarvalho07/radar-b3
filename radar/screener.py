@@ -97,7 +97,9 @@ def rodar(config: dict | None = None) -> tuple[dict, pd.DataFrame, dict]:
                 candidatos.add(papel)
     papeis_watch = [w["papel"].upper() for w in watchlist]
 
-    historicos = fontes.baixar_historico(candidatos | set(papeis_watch))
+    # Preços de todas as ações com liquidez (não só das candidatas), para o app mostrar
+    # gráfico, régua e leitura de qualquer uma. O histórico de 1 ano vem uma vez por dia.
+    historicos = fontes.baixar_historico(set(universo.index) | candidatos | set(papeis_watch))
     # Se o Yahoo falhar, abortar evita alertas falsos de "saiu" em massa.
     if candidatos and not historicos:
         raise RuntimeError("O Yahoo Finance não devolveu preços. Tente de novo em alguns minutos.")

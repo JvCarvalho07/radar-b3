@@ -233,7 +233,29 @@ def resumo_mercado() -> dict:
             resultado["dolar"] = _dolar_ptax()
         except Exception as erro_bc:
             log.warning("Falha ao obter dólar: %s", erro_bc)
+    if "dolar" in resultado:
+        try:
+            resultado["dolar"]["serie"] = serie_dolar()
+        except Exception as erro:
+            log.warning("Falha na série do dólar: %s", erro)
     return resultado
+
+
+def serie_dolar() -> list:
+    """PTAX diária de 1 ano (Banco Central), para o gráfico do dólar. Cache de 1 dia."""
+    arq = _cache("dolar_serie")
+    em_cache = _ler_cache(arq)
+    if em_cache:
+        return em_cache
+    fim = date.today()
+    inicio = fim - pd.Timedelta(days=370)
+    url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+           "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+           f"?@dataInicial='{inicio:%m-%d-%Y}'&@dataFinalCotacao='{fim:%m-%d-%Y}'&$format=json")
+    serie = [[c["dataHoraCotacao"][:10], round(float(c["cotacaoVenda"]), 4)]
+             for c in requests.get(url, headers=HEADERS, timeout=30).json()["value"]]
+    arq.write_bytes(pickle.dumps(serie))
+    return serie
 
 
 # Bolsas do mundo: ticker do Yahoo → (código numérico ISO do país, como no mapa world-atlas; país; índice)

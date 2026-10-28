@@ -19,10 +19,10 @@ const carregarScript = (src) => new Promise((ok, erro) => {
 async function montarGlobo(slot) {
   slot.insertAdjacentHTML("beforeend", `<section class="painel mundo" id="mundo">
     <div class="painel-cabeca"><h2>O mundo hoje</h2>
-      <div class="pilulas" style="margin-left:auto"><button type="button" data-modo="bolsas" class="ativo">Bolsas</button><button type="button" data-modo="moedas">Moedas contra o real</button></div></div>
+      <div class="pilulas" style="margin-left:auto"><button type="button" data-modo="moedas" class="ativo">Moedas em reais</button><button type="button" data-modo="bolsas">Bolsas</button></div></div>
     <div class="mundo-grade">
       <div class="globo-caixa"><svg class="globo" viewBox="0 0 600 600" role="img" aria-label="Globo com a variação de cada país"></svg><div class="dica-globo"></div>
-        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.bolsas}</p></div>
+        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p></div>
       <aside class="mundo-lista" id="mundo-lista"><div class="carregando"></div><div class="carregando" style="width:40%"></div></aside>
     </div></section>`);
   const caixa = $("#mundo"), svgEl = $(".globo", caixa), dicaEl = $(".dica-globo", caixa);
@@ -47,8 +47,21 @@ async function montarGlobo(slot) {
   svg.append("path").datum({ type: "Sphere" }).attr("class", "esfera").attr("fill", "url(#oceano)");
   svg.append("path").datum(d3.geoGraticule10()).attr("class", "graticula");
   const terras = svg.append("g").selectAll("path").data(paises).join("path").attr("class", "pais");
+  const camadaRotulos = svg.append("g").attr("class", "rotulos-globo");
 
-  let modo = "bolsas";
+  let modo = "moedas";
+  const SIMBOLOS = { USD: "US$", EUR: "€", GBP: "£", JPY: "¥", CHF: "Fr", CAD: "C$", AUD: "A$", DKK: "kr", NOK: "kr", SEK: "kr" };
+  // Onde escrever cada rótulo: um país por moeda (o euro vai na Alemanha) ou cada país com bolsa.
+  const ONDE_MOEDA = { USD: "840", EUR: "276", GBP: "826", JPY: "392", CHF: "756", CAD: "124", AUD: "036", DKK: "208", NOK: "578", SEK: "752" };
+  const centro = Object.fromEntries(paises.map((f) => [f.id, d3.geoCentroid(f)]));
+  // Ajustes finos de posição para países cujo centróide cai fora do continente principal
+  centro["840"] = [-98, 39]; centro["250"] = [2.5, 46.5]; centro["578"] = [9, 61]; centro["124"] = [-100, 57];
+  const rotulos = () => modo === "moedas"
+    ? Object.entries(ONDE_MOEDA).filter(([m]) => Object.values(mundo.moedas || {}).some((d) => d.moeda === m)).map(([m, iso]) => {
+        const d = Object.values(mundo.moedas).find((x) => x.moeda === m);
+        return { iso, linha1: `${SIMBOLOS[m]} ${reais(d.valor, d.valor < 1 ? 4 : 2)}`, linha2: sinal(d.var), v: d.var };
+      })
+    : Object.entries(mundo.bolsas || {}).map(([iso, d]) => ({ iso, linha1: d.nome, linha2: sinal(d.var), v: d.var }));
   const dado = (f) => mundo[modo]?.[f.id];
   const cor = (v) => {
     if (v == null) return "rgba(255,244,236,.07)";
@@ -58,6 +71,21 @@ async function montarGlobo(slot) {
   const redesenhar = () => {
     svg.selectAll(".esfera, .graticula").attr("d", caminho);
     terras.attr("d", caminho);
+    const [l, f] = proj.rotate(), frente = [-l, -f];
+    camadaRotulos.selectAll("g").data(rotulos(), (r) => r.iso).join((e) => {
+      const g = e.append("g");
+      g.append("text").attr("class", "r1");
+      g.append("text").attr("class", "r2").attr("dy", 14);
+      return g;
+    }).each(function (r) {
+      const c = centro[r.iso], visivel = c && d3.geoDistance(c, frente) < 1.35;
+      const g = d3.select(this).style("display", visivel ? null : "none");
+      if (!visivel) return;
+      const [x, y] = proj(c);
+      g.attr("transform", `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+      g.select(".r1").text(r.linha1);
+      g.select(".r2").text(r.linha2).attr("class", `r2 ${r.v >= 0 ? "sobe" : "desce"}`);
+    });
   };
   const pintar = () => {
     terras.attr("fill", (f) => cor(dado(f)?.var)).classed("brasil", (f) => f.id === "076").classed("com-dado", (f) => !!dado(f));
@@ -95,7 +123,7 @@ async function montarGlobo(slot) {
     terras.classed("realce", (p) => p.id === b.dataset.iso);
   });
   $("#mundo-lista").addEventListener("mouseleave", () => terras.classed("realce", false));
-  ligarAbas(caixa, "modo", (m) => { modo = m; pintar(); });
+  ligarAbas(caixa, "modo", (m) => { modo = m; pintar(); redesenhar(); });
 
   const relogio = d3.timer(() => {
     if (document.hidden) return;

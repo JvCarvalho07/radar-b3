@@ -215,6 +215,48 @@ function montarPilha(frente = 0) {
     <a class="botao-fogo" href="#acao/${esc(papel)}" data-comprar><i class="ti ti-shopping-cart"></i>Como comprar</a>`;
 }
 
+// O gráfico do topo mostra o Ibovespa (o termômetro da bolsa inteira) por padrão,
+// mas dá para trocar pelo dólar ou por qualquer ação da watchlist.
+function montarTopo(ib, us) {
+  const el = $("#g-ibov");
+  el.innerHTML = "";
+  const g = grafico(el), s = area(g);
+  let atual = null, periodo = "6M";
+  const fontes = {
+    ibov: async () => ib?.serie && { rotulo: "Ibovespa, o índice das maiores ações da B3", valor: num(ib.valor, 0), unidade: "pontos", hoje: ib.var_dia, serie: ib.serie, fmt: (v) => `${num(v, 0)} pontos` },
+    dolar: async () => us?.serie && { rotulo: "Dólar em reais (PTAX do Banco Central)", valor: reais(us.valor, 3), unidade: "", hoje: us.var_dia, serie: us.serie, fmt: (v) => reais(v, 3) },
+  };
+  const daAcao = async (p) => {
+    const velas = await carregarJSON(`dados/precos/${p}.json`).catch(() => null);
+    const u = estado.universo[p] || {};
+    return velas && { rotulo: `${p} · ${curto(u.nome) || "ação da watchlist"}`, valor: reais(precoDe(p)), unidade: "", hoje: u.var_dia, serie: velas.map((v) => [v[0], v[4]]), fmt: (v) => reais(v), papel: p };
+  };
+  const pintar = () => {
+    if (!atual) return;
+    const d = atual.serie.slice(-PERIODOS[periodo]);
+    s.setData(d.map(([time, value]) => ({ time, value })));
+    s.setMarkers(eventoMaior(d));
+    g.timeScale().fitContent();
+    const v = dif(d.at(-1)[1], d[0][1]);
+    $("#ibov-per").innerHTML = `<span class="${cls(v)}">${sinal(v, 1)}</span> em ${periodo === "1A" ? "12 meses" : periodo === "1M" ? "1 mês" : periodo.replace("M", " meses")}`
+      + (atual.papel ? ` · <a href="#acao/${esc(atual.papel)}" style="color:var(--laranja-2);font-weight:600">ver análise</a>` : "");
+  };
+  const escolher = async (chave) => {
+    const dado = await (fontes[chave] ? fontes[chave]() : daAcao(chave));
+    if (!dado) { $("#topo-rotulo").textContent = "Sem dados para este gráfico nesta atualização."; return; }
+    atual = dado;
+    $("#topo-rotulo").textContent = dado.rotulo;
+    $("#topo-valor").textContent = dado.valor;
+    $("#topo-unidade").textContent = dado.unidade;
+    $("#topo-hoje").innerHTML = dado.hoje == null ? "" : `<span class="pilula ${cls(dado.hoje)}">${sinal(dado.hoje)} hoje</span>`;
+    pintar();
+  };
+  dica(g, el, () => s, (v) => atual?.fmt(v) ?? num(v));
+  ligarAbas($("#p-ibov"), "periodo", (p) => { periodo = p; pintar(); });
+  ligarAbas($("#p-ibov"), "serie", escolher);
+  escolher("ibov");
+}
+
 function telaInicio() {
   const r = estado.resultado, ib = r.mercado?.ibovespa, us = r.mercado?.dolar;
   const ests = Object.entries(r.estrategias);
@@ -226,9 +268,13 @@ function telaInicio() {
       ${estado.historico.length ? (n ? ` <b>${n} mudança${n > 1 ? "s" : ""}</b> nas suas estratégias na última atualização.` : " Nenhuma mudança nas suas estratégias na última atualização.") : ""}`)}
     <div class="heroi">
       <section class="painel h-ibov coluna-flex" id="p-ibov">
+        <div class="seletor-topo" role="tablist" aria-label="O que mostrar no gráfico">
+          <button type="button" data-serie="ibov" class="ativo">Ibovespa</button><button type="button" data-serie="dolar">Dólar</button>
+          ${r.watchlist.map((w) => `<button type="button" data-serie="${esc(w.papel)}">${esc(w.papel)}</button>`).join("")}
+        </div>
         <div class="topo">
-          <div><div class="muted">Ibovespa</div>
-            <div class="valor"><span class="figura" style="font-size:36px;line-height:42px">${ib ? num(ib.valor, 0) : "—"}</span><span class="faint">pontos</span>${ib ? `<span class="pilula ${cls(ib.var_dia)}">${sinal(ib.var_dia)} hoje</span>` : ""}</div>
+          <div><div class="muted" id="topo-rotulo"></div>
+            <div class="valor"><span class="figura" style="font-size:36px;line-height:42px" id="topo-valor">—</span><span class="faint" id="topo-unidade"></span><span id="topo-hoje"></span></div>
             <div class="faint" id="ibov-per" style="margin-top:2px"></div></div>
           ${abasPeriodo("6M")}
         </div>
@@ -302,20 +348,7 @@ function telaInicio() {
   mov("alta");
   ligarAbas(tela, "mov", mov);
 
-  if (ib?.serie && window.LightweightCharts) {
-    const el = $("#g-ibov"), g = grafico(el), s = area(g);
-    dica(g, el, () => s, (v) => `${num(v, 0)} pontos`);
-    const aplicar = (per) => {
-      const d = ib.serie.slice(-PERIODOS[per]);
-      s.setData(d.map(([time, value]) => ({ time, value })));
-      s.setMarkers(eventoMaior(d));
-      g.timeScale().fitContent();
-      const v = dif(d.at(-1)[1], d[0][1]);
-      $("#ibov-per").innerHTML = `<span class="${cls(v)}">${sinal(v, 1)}</span> em ${per === "1A" ? "12 meses" : per === "1M" ? "1 mês" : per.replace("M", " meses")}`;
-    };
-    aplicar("6M");
-    ligarAbas($("#p-ibov"), "periodo", aplicar);
-  }
+  if (window.LightweightCharts) montarTopo(ib, us);
 }
 
 // Anota o maior movimento do período quando ele é bem maior que o normal (regra da skill: explicar o salto).
@@ -383,8 +416,46 @@ function desenharEstrategia() {
 }
 
 // ---------- Ação ----------
+const COLUNAS_LISTA = [
+  ["papel", "Ação", ""], ["setor", "Setor", "esconde-celular"], ["preco", "Preço", "n"], ["var_dia", "Hoje", "n"], ["var_30d", "30 dias", "n esconde-celular"],
+  ["pl", "P/L", "n esconde-celular"], ["dy", "DY", "n esconde-celular"], ["roe", "ROE", "n esconde-celular"], ["pontos", "Pontos", "n"],
+];
+function telaLista() {
+  const todos = Object.entries(estado.universo).filter(([, u]) => u.cotacao != null || u.preco != null);
+  const setores = [...new Set(todos.map(([, u]) => SETORES[u.setor] || u.setor).filter(Boolean))].sort();
+  estado.lista ??= { q: "", setor: "", campo: "pontos", desc: true };
+  tela.innerHTML = `${cabecalho("Ações", `As ${todos.length} ações da B3 com pelo menos R$ 2 milhões negociados por dia. Toque numa para ver a régua de preço, a leitura e como comprar.`)}
+    <section class="painel">
+      <div class="filtros-lista">
+        <label class="campo-busca"><i class="ti ti-search"></i><input id="lista-q" placeholder="Filtrar por código ou nome" value="${esc(estado.lista.q)}" aria-label="Filtrar por código ou nome"></label>
+        <div class="pilulas" id="lista-setores"><button type="button" data-setor="" class="${estado.lista.setor ? "" : "ativo"}">Todos</button>${setores.map((x) => `<button type="button" data-setor="${esc(x)}" class="${estado.lista.setor === x ? "ativo" : ""}">${esc(x)}</button>`).join("")}</div>
+      </div>
+      <p class="faint" id="lista-conta" style="margin:12px 4px 0"></p>
+      <div class="rolagem"><table><thead><tr id="lista-cab"></tr></thead><tbody id="lista-corpo"></tbody></table></div>
+    </section>${rodape()}`;
+  const desenhar = () => {
+    const o = estado.lista, q = o.q.trim().toUpperCase();
+    const linhas = todos.filter(([p, u]) => (!q || p.includes(q) || (u.nome || "").toUpperCase().includes(q)) && (!o.setor || (SETORES[u.setor] || u.setor) === o.setor))
+      .map(([p, u]) => ({ ...u, papel: p, setor: SETORES[u.setor] || u.setor || "", preco: precoDe(p) }))
+      .sort((a, b) => { const x = a[o.campo], y = b[o.campo]; const r = typeof x === "string" || typeof y === "string" ? String(x ?? "").localeCompare(String(y ?? "")) : (x ?? -1e9) - (y ?? -1e9); return o.desc ? -r : r; });
+    $("#lista-conta").textContent = `${linhas.length} ${linhas.length === 1 ? "ação" : "ações"}`;
+    $("#lista-cab").innerHTML = COLUNAS_LISTA.map(([c, r, k]) => `<th class="ord ${k} ${o.campo === c ? "on" : ""}" data-ord="${c}">${r}${o.campo === c ? (o.desc ? " ↓" : " ↑") : ""}</th>`).join("");
+    $("#lista-corpo").innerHTML = linhas.map((l) => `<tr data-href="#acao/${esc(l.papel)}"><td>${ativoCel(l.papel)}</td><td class="esconde-celular faint">${esc(l.setor)}</td>
+      <td class="n">${num(l.preco)}</td><td class="n">${varCel(l.var_dia)}</td><td class="n esconde-celular">${varCel(l.var_30d, 1)}</td>
+      <td class="n esconde-celular">${num(l.pl, 1)}</td><td class="n esconde-celular">${l.dy == null ? "—" : num(l.dy, 1) + "%"}</td><td class="n esconde-celular">${l.roe == null ? "—" : num(l.roe, 1) + "%"}</td>
+      <td class="n">${l.pontos == null ? "—" : `<span class="pilula ${l.pontos >= 70 ? "pos" : l.pontos < 40 ? "neg" : "neutra"}">${l.pontos}</span>`}</td></tr>`).join("")
+      || `<tr><td colspan="9" class="faint">Nenhuma ação com esse filtro.</td></tr>`;
+    $$("[data-ord]").forEach((th) => th.onclick = () => { const c = th.dataset.ord; o.desc = o.campo === c ? !o.desc : !["papel", "setor"].includes(c); o.campo = c; desenhar(); });
+    ligarLinhas();
+  };
+  $("#lista-q").oninput = (e) => { estado.lista.q = e.target.value; desenhar(); };
+  ligarAbas(tela, "setor", (x) => { estado.lista.setor = x; desenhar(); });
+  desenhar();
+}
+
 async function telaAcao(arg) {
-  const papel = (arg || estado.resultado.watchlist[0]?.papel || "PETR4").toUpperCase();
+  if (!arg) return telaLista();
+  const papel = arg.toUpperCase();
   const u = estado.universo[papel];
   if (!u) {
     tela.innerHTML = `${cabecalho(esc(papel), "Este código não está entre as ações com negociação suficiente (mais de R$ 2 milhões por dia) ou não existe.")}`;

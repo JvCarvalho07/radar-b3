@@ -13,3 +13,6 @@ __pycache__/
 
 # Verificações locais da taste-skill
 .taste-skill/
+
+# Torneios da skill arena
+.arena/
