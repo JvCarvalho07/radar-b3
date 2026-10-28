@@ -281,6 +281,28 @@ th.ord:hover, th.ord.on { color: var(--texto); }
 .rede-detalhe { padding: 22px; border-radius: 22px; background: rgba(0, 0, 0, .25); border: 1px solid var(--linha); min-height: 420px; display: flex; flex-direction: column; }
 .rede-detalhe .botao-fogo, .rede-detalhe .botao-vidro { margin-top: auto !important; }
 
+/* O mundo hoje (globo) */
+.mundo { grid-column: 1 / -1; }
+.mundo-grade { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
+.globo-caixa { position: relative; }
+.globo { width: 100%; max-height: 600px; display: block; cursor: grab; touch-action: none; }
+.globo:active { cursor: grabbing; }
+.globo .graticula { fill: none; stroke: rgba(255, 200, 150, .07); stroke-width: .6; }
+.globo .pais { stroke: rgba(20, 10, 6, .9); stroke-width: .5; transition: fill .4s; }
+.globo .pais.com-dado { stroke: rgba(255, 244, 236, .25); stroke-width: .7; }
+.globo .pais.brasil { stroke: #ffb057; stroke-width: 1.6; }
+.globo .pais.realce, .globo .pais:hover { stroke: #fff; stroke-width: 1.8; }
+.dica-globo { position: absolute; z-index: 5; pointer-events: none; padding: 9px 13px; border-radius: 13px; background: #fff; color: #1d120c; font-size: 12.5px; line-height: 17px; white-space: nowrap; box-shadow: 0 14px 34px rgba(0, 0, 0, .35); transform: translate(-50%, calc(-100% - 14px)); opacity: 0; transition: opacity .12s; }
+.dica-globo b { display: block; }
+.dica-globo.on { opacity: 1; }
+.dica-globo .pos { color: #15803d; } .dica-globo .neg { color: #c2410c; }
+.legenda-globo { text-align: center; max-width: 560px; margin: 6px auto 0; line-height: 19px; }
+.mundo-lista { display: flex; flex-direction: column; gap: 6px; max-height: 600px; overflow-y: auto; padding-right: 4px; }
+.mundo-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px; border-radius: 16px; background: rgba(255, 244, 236, .035); text-align: left; transition: background .2s; }
+.mundo-item:hover { background: rgba(255, 244, 236, .08); }
+.mundo-item b { display: block; font-weight: 600; }
+.mundo-item .faint { font-size: 12px; }
+
 /* ---------- Tela da ação ---------- */
 .fogo { overflow: hidden; background: radial-gradient(90% 110% at 85% -10%, rgba(255, 122, 31, .42), rgba(255, 77, 46, .10) 45%, transparent 70%), var(--vidro), var(--vidro-solido); }
 .fogo > * { position: relative; z-index: 1; }
@@ -402,7 +424,8 @@ pre.exemplo code { font: 13px/20px ui-monospace, Consolas, monospace; color: var
   .marco.secundario { display: none; }
   .fogo-topo .achado { margin-left: 0; }
   .parede { font-size: 64px; }
-  .rede-grade { grid-template-columns: minmax(0, 1fr); }
+  .rede-grade, .mundo-grade { grid-template-columns: minmax(0, 1fr); }
+  .mundo-lista { max-height: 340px; }
   .rede-svg .rot-acao { display: none; }
   .rede-detalhe { min-height: 0; }
   .botao.branco, .botao.vazado { flex: 1; justify-content: center; }

@@ -37,6 +37,7 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
 
     _json(dados / "resultado.json", resultado)
     _json(dados / "historico.json", alertas.ler_historico())
+    _json(dados / "mundo.json", fontes.baixar_mundo())
 
     perfis = fontes.baixar_perfis(historicos)
     contagem = {}

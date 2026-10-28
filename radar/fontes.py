@@ -236,6 +236,76 @@ def resumo_mercado() -> dict:
     return resultado
 
 
+# Bolsas do mundo: ticker do Yahoo → (código numérico ISO do país, como no mapa world-atlas; país; índice)
+INDICES = {
+    "^GSPC": ("840", "Estados Unidos", "S&P 500"), "^GSPTSE": ("124", "Canadá", "S&P/TSX"), "^MXX": ("484", "México", "IPC"),
+    "^BVSP": ("076", "Brasil", "Ibovespa"), "^FTSE": ("826", "Reino Unido", "FTSE 100"), "^GDAXI": ("276", "Alemanha", "DAX"),
+    "^FCHI": ("250", "França", "CAC 40"), "FTSEMIB.MI": ("380", "Itália", "FTSE MIB"), "^IBEX": ("724", "Espanha", "IBEX 35"),
+    "^N225": ("392", "Japão", "Nikkei 225"), "000001.SS": ("156", "China", "Xangai"), "^KS11": ("410", "Coreia do Sul", "KOSPI"),
+    "^BSESN": ("356", "Índia", "Sensex"), "^AXJO": ("036", "Austrália", "ASX 200"), "^TWII": ("158", "Taiwan", "TAIEX"),
+}
+# Moedas com PTAX no Banco Central → países que as usam
+ZONA_EURO = {"276": "Alemanha", "250": "França", "380": "Itália", "724": "Espanha", "620": "Portugal", "528": "Países Baixos",
+             "056": "Bélgica", "040": "Áustria", "372": "Irlanda", "246": "Finlândia", "300": "Grécia", "703": "Eslováquia",
+             "705": "Eslovênia", "233": "Estônia", "428": "Letônia", "440": "Lituânia", "196": "Chipre", "442": "Luxemburgo", "191": "Croácia"}
+MOEDAS = {
+    "USD": ("Dólar americano", {"840": "Estados Unidos"}), "EUR": ("Euro", ZONA_EURO), "GBP": ("Libra esterlina", {"826": "Reino Unido"}),
+    "JPY": ("Iene", {"392": "Japão"}), "CHF": ("Franco suíço", {"756": "Suíça"}), "CAD": ("Dólar canadense", {"124": "Canadá"}),
+    "AUD": ("Dólar australiano", {"036": "Austrália"}), "DKK": ("Coroa dinamarquesa", {"208": "Dinamarca"}),
+    "NOK": ("Coroa norueguesa", {"578": "Noruega"}), "SEK": ("Coroa sueca", {"752": "Suécia"}),
+}
+
+
+def _ptax_moeda(moeda: str) -> dict | None:
+    fim = date.today()
+    inicio = fim - pd.Timedelta(days=10)
+    url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+           "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
+           f"?@moeda='{moeda}'&@dataInicial='{inicio:%m-%d-%Y}'&@dataFinalCotacao='{fim:%m-%d-%Y}'"
+           "&$format=json&$filter=tipoBoletim%20eq%20'Fechamento'")
+    v = requests.get(url, headers=HEADERS, timeout=20).json()["value"]
+    if len(v) < 2:
+        return None
+    atual, anterior = float(v[-1]["cotacaoVenda"]), float(v[-2]["cotacaoVenda"])
+    return {"valor": atual, "var": (atual / anterior - 1) * 100, "data": v[-1]["dataHoraCotacao"][:10]}
+
+
+def baixar_mundo() -> dict:
+    """Bolsas do mundo (Yahoo) e moedas contra o real (PTAX). Nunca derruba a triagem."""
+    arq = _cache("mundo")
+    anterior = _ler_cache(arq) or {}
+    mundo = {"bolsas": {}, "moedas": {}}
+    try:
+        dados = yf.download(list(INDICES), period="7d", interval="1d", progress=False, group_by="ticker", auto_adjust=False)
+        for tk, (iso, pais, nome) in INDICES.items():
+            try:
+                fech = dados[tk]["Close"].dropna()
+                if len(fech) >= 2:
+                    mundo["bolsas"][iso] = {"pais": pais, "nome": nome, "valor": round(float(fech.iloc[-1]), 2),
+                                            "var": round((float(fech.iloc[-1]) / float(fech.iloc[-2]) - 1) * 100, 2),
+                                            "data": fech.index[-1].strftime("%Y-%m-%d")}
+            except (KeyError, IndexError):
+                continue
+    except Exception as erro:
+        log.warning("Falha ao obter bolsas do mundo: %s", erro)
+    for moeda, (nome, paises) in MOEDAS.items():
+        try:
+            c = _ptax_moeda(moeda)
+        except Exception as erro:
+            log.warning("Falha na PTAX de %s: %s", moeda, erro)
+            c = None
+        if c:
+            for iso, pais in paises.items():
+                mundo["moedas"][iso] = {"pais": pais, "moeda": moeda, "nome": nome, "valor": round(c["valor"], 4),
+                                        "var": round(c["var"], 2), "data": c["data"]}
+    # O que falhou agora fica com o último valor bom do dia.
+    for parte in ("bolsas", "moedas"):
+        if not mundo[parte] and anterior.get(parte):
+            mundo[parte] = anterior[parte]
+    arq.write_bytes(pickle.dumps(mundo))
+    return mundo
+
+
 def _dolar_ptax() -> dict:
     """Última PTAX (oficial do Banco Central) e variação contra o dia útil anterior."""
     fim = date.today()
