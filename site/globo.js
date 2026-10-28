@@ -22,7 +22,8 @@ async function montarGlobo(slot) {
       <div class="pilulas" style="margin-left:auto"><button type="button" data-modo="moedas" class="ativo">Moedas em reais</button><button type="button" data-modo="bolsas">Bolsas</button></div></div>
     <div class="mundo-grade">
       <div class="globo-caixa"><svg class="globo" viewBox="0 0 600 600" role="img" aria-label="Globo com a variação de cada país"></svg><div class="dica-globo"></div>
-        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p></div>
+        <p class="faint legenda-globo" id="legenda-globo">${LEGENDAS.moedas}</p>
+        <div class="destaques-globo" id="destaques-globo"></div></div>
       <aside class="mundo-lista" id="mundo-lista"><div class="carregando"></div><div class="carregando" style="width:40%"></div></aside>
     </div></section>`);
   const caixa = $("#mundo"), svgEl = $(".globo", caixa), dicaEl = $(".dica-globo", caixa);
@@ -96,6 +97,20 @@ async function montarGlobo(slot) {
         <span><b>${esc(modo === "bolsas" ? d.pais : d.nome)}</b><span class="faint">${esc(modo === "bolsas" ? `${d.nome} · ${num(d.valor, 0)}` : `${d.moeda} · ${reais(d.valor, d.valor < 1 ? 4 : 3)}`)}</span></span>
         <span class="pilula ${cls(d.var)}">${sinal(d.var)}</span></button>`).join("")
       : '<div class="vazio">Sem dados nesta atualização.</div>';
+    const linha = ([iso, d]) => `<button type="button" class="item-moeda ${d.var >= 0 ? "pos" : "neg"}" data-iso="${iso}"><b>${esc(modo === "bolsas" ? d.pais : d.nome)}</b><span>${esc(modo === "bolsas" ? num(d.valor, 0) : reais(d.valor, d.valor < 1 ? 4 : 3))}</span><em>${sinal(d.var)}</em></button>`;
+    const usd = modo === "moedas" ? itens.find(([, d]) => d.moeda === "USD") : null;
+    const resto = itens.filter((x) => x !== usd);
+    const vars = itens.map(([, d]) => d.var), sobem = vars.filter((v) => v > 0).length;
+    const frase = modo === "moedas"
+      ? (sobem === 0
+        ? `O real se valorizou contra todas as ${itens.length} moedas hoje (de ${sinal(Math.max(...vars))} a ${sinal(Math.min(...vars))}). É um movimento comum, não um dado isolado.`
+        : `${sobem} de ${itens.length} moedas subiram contra o real hoje.`)
+      : `${sobem} de ${itens.length} bolsas subiram hoje.`;
+    $("#destaques-globo").innerHTML = itens.length
+      ? `${usd ? `<div class="dolar-fixo"><h3 class="faint">Dólar (USD)</h3>${linha(usd)}</div>` : ""}
+         <p class="faint frase-globo">${frase}</p>
+         <div class="todos-destaques"><h3 class="faint">${modo === "bolsas" ? "Todas as bolsas" : "Demais moedas"}, da maior alta para a maior queda</h3>${resto.map(linha).join("")}</div>`
+      : "";
   };
   redesenhar();
   pintar();
@@ -123,6 +138,10 @@ async function montarGlobo(slot) {
     terras.classed("realce", (p) => p.id === b.dataset.iso);
   });
   $("#mundo-lista").addEventListener("mouseleave", () => terras.classed("realce", false));
+  $("#destaques-globo").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-iso]"), f = b && paises.find((p) => p.id === b.dataset.iso);
+    if (f) { const [lon, lat] = d3.geoCentroid(f); alvo = [-lon, -lat]; }
+  });
   ligarAbas(caixa, "modo", (m) => { modo = m; pintar(); redesenhar(); });
 
   const relogio = d3.timer(() => {

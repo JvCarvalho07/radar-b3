@@ -187,7 +187,7 @@ function barrasMeses(serie) {
 }
 
 function montarPilha(frente = 0) {
-  const w = estado.resultado.watchlist.slice(0, 4);
+  const w = estado.resultado.watchlist.slice(0, 5);
   const el = $("#pilha");
   if (!el) return;
   if (!w.length) { el.innerHTML = '<div class="vazio">Sua watchlist está vazia.</div>'; el.style.height = "auto"; return; }
@@ -257,6 +257,24 @@ function montarTopo(ib, us) {
   escolher("ibov");
 }
 
+// "Perto de entrar": ações a 1 critério de alguma estratégia (regra da Rede v4), as mais líquidas primeiro.
+function pertoDeEntrar() {
+  const perto = (typeof resumoRede === "function" ? resumoRede() : []).filter((l) => l.faltam === 1)
+    .sort((a, b) => (b.u.liq_2meses || 0) - (a.u.liq_2meses || 0)).slice(0, 5);
+  const falta = (l) => {
+    const i = l.r.itens.find((x) => x.falha || x.semDado);
+    if (!i) return "";
+    const p = PCT.has(i.c.campo) ? "%" : "", lim = i.c.min != null && i.v < i.c.min ? `mínimo ${num(i.c.min, 1)}${p}` : `máximo ${num(i.c.max, 1)}${p}`;
+    return i.semDado ? `${ROTULOS[i.c.campo] || i.c.campo} sem dado` : `${ROTULOS[i.c.campo] || i.c.campo} ${num(i.v, 1)}${p} · ${lim}`;
+  };
+  return `<section class="painel destaque"><div class="orbe"></div>
+    <div class="faint">Perto de entrar nas suas estratégias</div>
+    <h2>Falta 1 critério para ${perto.length ? (resumoRede().filter((l) => l.faltam === 1).length) : 0} ações</h2>
+    <div class="razoes">${perto.map((l) => `<a href="#acao/${esc(l.papel)}" style="display:flex;gap:10px;align-items:center">${logo(l.papel)}<div style="min-width:0"><b>${esc(l.papel)}</b> · ${esc(estado.resultado.estrategias[l.k].nome)}<div style="opacity:.85">${esc(falta(l))}</div></div></a>`).join("") || "<span>Nenhuma ação está a 1 critério agora.</span>"}</div>
+    <a class="botao-branco" href="#inicio" data-rolar="rede">Ver na Rede do Radar</a>
+  </section>`;
+}
+
 function telaInicio() {
   const r = estado.resultado, ib = r.mercado?.ibovespa, us = r.mercado?.dolar;
   const ests = Object.entries(r.estrategias);
@@ -281,14 +299,7 @@ function telaInicio() {
         <div class="grafico" id="g-ibov">${ib?.serie ? "" : '<div class="vazio" style="margin:20px 6px">O Yahoo Finance não respondeu nesta atualização. O gráfico volta na próxima, em até 15 minutos.</div>'}</div>
       </section>
 
-      ${dest ? `<section class="painel destaque"><div class="orbe"></div>
-        <div class="faint">Maior pontuação dos sinais hoje</div>
-        <div style="display:flex;gap:14px;align-items:center;position:relative">${logo(dest, "g")}
-          <div style="min-width:0"><h2>${esc(dest)}</h2><div class="faint">${esc(curto(ud.nome) || "")}</div></div>
-          <div style="margin-left:auto;text-align:right"><div style="font:700 34px/1 var(--font)">${ud.pontos}</div><div class="faint">de 100</div></div></div>
-        <div class="razoes">${(ud.a_favor || []).slice(0, 3).map((x) => `<span><i class="ti ti-check" style="font-size:16px"></i>${esc(x.t)}</span>`).join("")}</div>
-        <a class="botao-branco" href="#acao/${esc(dest)}">Ver a análise completa</a>
-      </section>` : `<section class="painel"><div class="vazio">Nenhuma ação nas estratégias agora.</div></section>`}
+      ${pertoDeEntrar()}
 
       <section class="painel">
         <div class="painel-cabeca"><h2>Ibovespa mês a mês</h2><span class="extra">variação de cada mês</span></div>
@@ -323,7 +334,7 @@ function telaInicio() {
     <div id="slot-rede" style="display:contents"></div>
 
     <section class="painel s7">
-      <div class="painel-cabeca"><h2>Em movimento hoje</h2>
+      <div class="painel-cabeca"><h2>Em movimento hoje</h2><span class="extra">10 de ${movers.length}</span>
         <div class="pilulas" style="margin-left:auto"><button type="button" data-mov="alta" class="ativo">Maiores altas</button><button type="button" data-mov="baixa">Maiores baixas</button></div></div>
       <div class="rolagem"><table><thead><tr><th>Ação</th><th class="n">Preço</th><th class="n">Hoje</th><th class="n esconde-celular">30 dias</th></tr></thead><tbody id="t-mov"></tbody></table></div>
     </section>
@@ -341,7 +352,7 @@ function telaInicio() {
   montarRede($("#slot-rede"));
   montarGlobo($("#slot-rede"));
   const mov = (lado) => {
-    const lista = [...movers].sort((a, b) => lado === "alta" ? b[1].var_dia - a[1].var_dia : a[1].var_dia - b[1].var_dia).slice(0, 5);
+    const lista = [...movers].sort((a, b) => lado === "alta" ? b[1].var_dia - a[1].var_dia : a[1].var_dia - b[1].var_dia).slice(0, 10);
     $("#t-mov").innerHTML = lista.map(([p, u]) => `<tr data-href="#acao/${esc(p)}"><td>${ativoCel(p)}</td><td class="n">${num(precoDe(p))}</td><td class="n">${varCel(u.var_dia)}</td><td class="n esconde-celular">${varCel(u.var_30d, 1)}</td></tr>`).join("");
     ligarLinhas();
   };

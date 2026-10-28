@@ -281,6 +281,32 @@ th.ord:hover, th.ord.on { color: var(--texto); }
 .rede-detalhe { padding: 22px; border-radius: 22px; background: rgba(0, 0, 0, .25); border: 1px solid var(--linha); min-height: 420px; display: flex; flex-direction: column; }
 .rede-detalhe .botao-fogo, .rede-detalhe .botao-vidro { margin-top: auto !important; }
 
+/* Rede do Radar v4 (proposta vencedora da arena) */
+.rede-caixa { display: contents; }
+.rede-svg .no { stroke: rgba(0, 0, 0, .35); stroke-width: 1; cursor: pointer; transition: opacity .2s; }
+.rede-svg .captura { fill: transparent; cursor: pointer; }
+.rede-svg .liga { fill: none; stroke: #ffb057; stroke-width: 1.4; opacity: .85; pointer-events: none; }
+.rede-svg .liga.pontilhada { stroke-dasharray: 4 4; opacity: .55; }
+.rede-svg.focado .no { opacity: .16; }
+.rede-svg.focado .no.on { opacity: 1; stroke: #fff; stroke-width: 2; }
+.rede-svg .no:focus-visible { outline: none; stroke: #fff; stroke-width: 2.5; }
+.rede-svg .etiqueta { fill: #fff; font: 800 14px var(--font); pointer-events: none; }
+.rede-svg .setor-rot { font: 700 11px var(--font); pointer-events: none; stroke: #1b110c; stroke-width: 4px; paint-order: stroke; }
+.lista-criterios { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.lista-criterios li { display: flex; justify-content: space-between; gap: 10px; }
+.lista-criterios li span { color: var(--muted); }
+.lista-criterios .ok { color: #8fe3b5; }
+.lista-criterios .falha { color: #ffb08a; }
+.lista-todas { margin-top: 18px; }
+.lista-todas summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+.grupo-rede { margin: 18px 0 8px; font-size: 13px; color: var(--muted); }
+.lista-rede { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lista-rede a { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; padding: 10px; border-radius: 10px; color: inherit; text-decoration: none; }
+.lista-rede a:hover, .lista-rede a:focus-visible { background: rgba(255, 255, 255, .06); }
+.lista-rede span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lista-rede em { font-style: normal; font-size: 12px; color: var(--muted); text-align: right; }
+@media (max-width: 760px) { .rede-svg .setor-rot { display: none; } }
+
 /* O mundo hoje (globo) */
 .mundo { grid-column: 1 / -1; }
 .mundo-grade { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 24px; align-items: start; }
@@ -449,3 +475,25 @@ pre.exemplo code { font: 13px/20px ui-monospace, Consolas, monospace; color: var
 .campo-busca { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border-radius: 16px; background: var(--fundo-campo); border: 1px solid var(--linha); color: var(--muted); }
 .campo-busca input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--texto); font: 500 15px var(--font); }
 .filtros-lista .pilulas { flex-wrap: nowrap; }
+
+/* Faixa do globo: dólar fixo e todas as moedas (proposta da arena) */
+.destaques-globo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 12px; }
+.destaques-globo .dolar-fixo, .destaques-globo .frase-globo, .destaques-globo .todos-destaques { grid-column: 1 / -1; }
+.todos-destaques { display: grid; grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.todos-destaques h3 { grid-column: 1 / -1; }
+.destaques-globo h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.frase-globo { margin: 0; font-size: 13px; }
+.item-moeda { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; width: 100%; padding: 6px 0; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.item-moeda b { font-size: 13px; }
+.item-moeda span { grid-column: 1; font-size: 12px; color: var(--muted); }
+.item-moeda em { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-style: normal; font-weight: 700; }
+.item-moeda.pos em { color: #8fe3b5; }
+.item-moeda.neg em { color: #ffb08a; }
+@media (max-width: 760px) { .todos-destaques { grid-template-columns: 1fr; } }
+
+.grupo-recolhivel { border-radius: 16px; background: rgba(255, 244, 236, .035); margin-bottom: 8px; }
+.grupo-recolhivel summary { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; font-weight: 600; list-style: none; }
+.grupo-recolhivel summary::-webkit-details-marker { display: none; }
+.grupo-recolhivel summary b { color: var(--laranja-2); }
+.grupo-recolhivel[open] summary { border-bottom: 1px solid var(--linha); }
+.grupo-recolhivel .lista-rede { padding: 6px; }
