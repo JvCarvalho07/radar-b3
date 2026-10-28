@@ -254,6 +254,33 @@ th.ord:hover, th.ord.on { color: var(--texto); }
 .estrategias { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .est-col { padding: 4px; display: flex; flex-direction: column; gap: 10px; }
 
+/* Rede do Radar (refs. 4 e 5) */
+.rede { grid-column: 1 / -1; overflow: hidden; background: radial-gradient(60% 70% at 35% 50%, rgba(255, 122, 31, .12), transparent 70%), var(--vidro), var(--vidro-solido); }
+.rede-grade { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: center; }
+.rede-svg { width: 100%; max-height: 760px; display: block; overflow: visible; }
+.rede-svg .aneis circle { fill: none; stroke: rgba(255, 232, 214, .07); stroke-width: 1; }
+.rede-svg .aneis .tracejado { stroke-dasharray: 2 6; stroke: rgba(255, 180, 110, .18); }
+.rede-svg .aneis { transform-origin: 400px 400px; animation: girar 120s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+.rede-svg .lig { fill: none; stroke: rgba(255, 150, 80, .16); stroke-width: 1; transition: stroke .2s, opacity .2s, stroke-width .2s; }
+.rede-svg .orbe-centro { filter: drop-shadow(0 0 26px rgba(255, 122, 31, .65)); }
+.rede-svg .centro-num { fill: #2a0d00; font: 800 30px var(--font); }
+.rede-svg .centro-rot { fill: #3a1404; font: 700 12px var(--font); }
+.rede-svg .no-est circle { fill: #2a1a12; stroke: rgba(255, 170, 100, .5); stroke-width: 1.5; transition: fill .2s, stroke .2s; cursor: pointer; }
+.rede-svg .no-est .est-num { fill: var(--texto); font: 800 17px var(--font); pointer-events: none; }
+.rede-svg .no-est .est-nome { fill: var(--muted); font: 600 10px var(--font); pointer-events: none; }
+.rede-svg .no-acao { cursor: pointer; stroke: rgba(0, 0, 0, .4); stroke-width: 1.5; transition: r .2s, opacity .2s; filter: drop-shadow(0 0 4px rgba(255, 140, 60, .6)); }
+.rede-svg .rot-acao { fill: var(--muted); font: 600 10.5px var(--font); cursor: pointer; transition: fill .2s, opacity .2s; }
+.rede-svg.focado .lig, .rede-svg.focado .no-acao, .rede-svg.focado .rot-acao { opacity: .13; }
+.rede-svg.focado .lig.on { opacity: 1; stroke: #ffb057; stroke-width: 2; }
+.rede-svg.focado .no-acao.on { opacity: 1; r: 9; }
+.rede-svg.focado .rot-acao.on { opacity: 1; fill: #fff; font-weight: 800; }
+.rede-svg .no-est.on circle { fill: #ff7a1f; stroke: #ffd29a; }
+.rede-svg .no-est.on .est-num, .rede-svg .no-est.on .est-nome { fill: #2a0d00; }
+.rede-svg :focus-visible { outline: none; stroke: #fff; stroke-width: 2.5; }
+.rede-detalhe { padding: 22px; border-radius: 22px; background: rgba(0, 0, 0, .25); border: 1px solid var(--linha); min-height: 420px; display: flex; flex-direction: column; }
+.rede-detalhe .botao-fogo, .rede-detalhe .botao-vidro { margin-top: auto !important; }
+
 /* ---------- Tela da ação ---------- */
 .fogo { overflow: hidden; background: radial-gradient(90% 110% at 85% -10%, rgba(255, 122, 31, .42), rgba(255, 77, 46, .10) 45%, transparent 70%), var(--vidro), var(--vidro-solido); }
 .fogo > * { position: relative; z-index: 1; }
@@ -345,6 +372,7 @@ pre.exemplo code { font: 13px/20px ui-monospace, Consolas, monospace; color: var
 @media (max-width: 1100px) {
   .s4, .s5, .s6, .s7, .s8 { grid-column: 1 / -1 !important; }
   .cartoes-est, .passos, .estrategias { grid-template-columns: minmax(0, 1fr); }
+  .rede-grade { grid-template-columns: minmax(0, 1fr) 280px; }
   .esconde-celular { display: none; }
   .busca { width: 260px; }
 }
@@ -374,6 +402,9 @@ pre.exemplo code { font: 13px/20px ui-monospace, Consolas, monospace; color: var
   .marco.secundario { display: none; }
   .fogo-topo .achado { margin-left: 0; }
   .parede { font-size: 64px; }
+  .rede-grade { grid-template-columns: minmax(0, 1fr); }
+  .rede-svg .rot-acao { display: none; }
+  .rede-detalhe { min-height: 0; }
   .botao.branco, .botao.vazado { flex: 1; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }

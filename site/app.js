@@ -290,6 +290,7 @@ function telaInicio() {
     ${rodape()}`;
 
   montarPilha(0);
+  montarRede($("#slot-rede"));
   const mov = (lado) => {
     const lista = [...movers].sort((a, b) => lado === "alta" ? b[1].var_dia - a[1].var_dia : a[1].var_dia - b[1].var_dia).slice(0, 5);
     $("#t-mov").innerHTML = lista.map(([p, u]) => `<tr data-href="#acao/${esc(p)}"><td>${ativoCel(p)}</td><td class="n">${num(precoDe(p))}</td><td class="n">${varCel(u.var_dia)}</td><td class="n esconde-celular">${varCel(u.var_30d, 1)}</td></tr>`).join("");
