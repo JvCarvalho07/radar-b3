@@ -1,9 +1,13 @@
 # 📡 Radar B3
 
-App de triagem de ações da B3 com notificações. A cada 15 minutos de pregão ele baixa os
+App de triagem de ações da B3 com notificações. A cada ~5 minutos de pregão ele baixa os
 indicadores de ~1000 papéis, aplica as **suas** regras (no `config.yaml`) e manda uma
 notificação no celular só quando algo muda: quando um papel entra ou sai de uma estratégia,
-ou cruza um preço da sua watchlist.
+ou cruza um preço da sua watchlist. Também tem análise de cada ação, carteira pessoal (fica só
+no seu navegador), globo com as bolsas do mundo e mapa do mercado.
+
+📘 **Vai mexer no projeto?** Leia antes o [RELATORIO.md](RELATORIO.md): como tudo funciona,
+pegadinhas dos dados, referências visuais, histórico e pendências.
 
 **App:** https://jvcarvalho07.github.io/radar-b3/
 
@@ -13,7 +17,7 @@ ou cruza um preço da sua watchlist.
 ## Como funciona
 
 ```
-GitHub Actions (a cada 15 min no pregão)
+GitHub Actions (a cada ~5 min no pregão, 10h–18h de Brasília)
   └─ scan.py ─ baixa dados ─ aplica estratégias ─ compara com a última vez
        ├─ mudou algo? → notificação push nos seus aparelhos
        ├─ estado e histórico → branch "dados"
@@ -21,13 +25,15 @@ GitHub Actions (a cada 15 min no pregão)
 ```
 
 Tudo roda de graça: GitHub Actions é ilimitado em repositório público, e o GitHub Pages hospeda o app.
+Quando sai versão nova do código, o app (inclusive o instalado no celular) se atualiza sozinho.
 
 ## Instalar no celular
 
 1. Abra o link do app no navegador do celular.
-2. **Android (Chrome):** menu ⋮ → *Adicionar à tela inicial*.
+2. **Android (Chrome):** toque em **Instalar** no aviso que aparece (ou menu ⋮ → *Instalar app*).
    **iPhone (Safari):** botão Compartilhar → *Adicionar à Tela de Início*. No iPhone, as
    notificações só funcionam abrindo o app pelo ícone (iOS 16.4 ou mais novo).
+   Não precisa reinstalar quando o app muda: ele se atualiza sozinho.
 3. Abra pelo ícone, vá em **Alertas → Ativar notificações** e permita.
 4. O app mostra um código. Copie, abra as *Secrets* do repositório (o app tem o link) e crie
    o secret **`PUSH_SUBSCRIPTIONS`** com esse código. Vários aparelhos: um código por linha.
@@ -95,10 +101,25 @@ Depois abra http://localhost:8000. Localmente, o estado fica em `dados/` e o cac
 ```
 config.yaml               suas regras e watchlist
 scan.py                   triagem + notificações + gera o site
-radar/fontes.py           coleta (Fundamentus, Yahoo Finance, AwesomeAPI) com cache diário
+radar/fontes.py           coleta (Fundamentus, Yahoo Finance, AwesomeAPI, PTAX do Banco Central) com cache diário
 radar/screener.py         aplica as estratégias e explica os motivos
+radar/analise.py          preço justo, faixas de preço, sinais a favor e de atenção
 radar/alertas.py          compara com a execução anterior e envia o push
-radar/publicar.py         monta a pasta publico/ (app + JSON)
+radar/publicar.py         monta a pasta publico/ (app + JSON) e carimba a versão do app
 site/                     o app (HTML, CSS, JS, service worker, ícones)
-.github/workflows/        agendamento no GitHub Actions
+.github/workflows/        radar.yml (coleta e publicação) e testes.yml (testes automáticos)
+testes/                   testes do Python e das contas da carteira
+RELATORIO.md              tudo sobre o projeto, para quem for continuar
 ```
+
+## Testes
+
+```bash
+.venv/Scripts/python -m unittest discover -s testes -v
+```
+
+```bash
+node testes/carteira.test.js
+```
+
+Os dois rodam sozinhos no GitHub a cada push (workflow *Testes*), separados da coleta.
