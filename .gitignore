@@ -16,3 +16,6 @@ __pycache__/
 
 # Torneios da skill arena
 .arena/
+
+# Imagens de referência do dono (podem ter direitos autorais; ficam só na máquina)
+referencias/
