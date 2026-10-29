@@ -12,6 +12,7 @@
    "CMIG4",
    "CSED3",
    "CYRE3",
+   "DIRR3",
    "FIQE3",
    "INTB3",
    "ISAE4",
@@ -23,9 +24,9 @@
    "PETR3",
    "PETR4",
    "PLPL3",
-   "POMO3",
    "POMO4",
    "PSSA3",
+   "RENT3",
    "SANB11",
    "SANB3",
    "SANB4",
@@ -33,9 +34,11 @@
    "SEER3",
    "SHUL4",
    "TAEE11",
+   "TAEE3",
    "TAEE4",
    "TEND3",
    "TRIS3",
+   "VBBR3",
    "VLID3",
    "VULC3",
    "WIZC3"
@@ -71,6 +74,7 @@
    "LOGG3",
    "LREN3",
    "MDNE3",
+   "MELK3",
    "MOTV3",
    "MULT3",
    "PINE4",
@@ -86,6 +90,7 @@
    "SANB4",
    "SBFG3",
    "SEER3",
+   "SMFT3",
    "TEND3",
    "TFCO4",
    "TRIS3",
@@ -102,7 +107,6 @@
    "BPAC11",
    "CMIN3",
    "CURY3",
-   "INTB3",
    "ITUB3",
    "ITUB4",
    "MILS3",
@@ -147,6 +151,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T20:01:02-03:00"
+  "em": "2026-10-28T21:54:00-03:00"
  }
 }
