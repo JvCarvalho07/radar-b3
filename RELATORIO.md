@@ -7,8 +7,7 @@ visuais e o que ainda falta.
 - **App no ar:** https://jvcarvalho07.github.io/radar-b3/
 - **Repositório:** https://github.com/JvCarvalho07/radar-b3
 - **Pasta local:** `C:\Users\Gaming\Documents\radar-b3`
-- **Dono:** João (GitHub `JvCarvalho07`). Fala português, não é programador; prefere respostas curtas,
-  diretas e em português do Brasil, sem jargão.
+- **Dono:** GitHub `JvCarvalho07`. Escreve em português do Brasil e prefere respostas curtas e diretas.
 
 ---
 
@@ -150,7 +149,9 @@ Imagens em `referencias/`:
 - `ref1.webp` — painel de vidro laranja com gráfico de saldo em área, cartões e botões (base da Carteira).
 - `ref2.webp` — painel verde com o menu aberto (base do menu lateral).
 - `ref3.webp` — cartões de vidro sobre imagem.
-- `ref4.webp` — referência extra de layout.
+- `ref4.webp` — painel escuro esverdeado ("Control AI"): uma esfera central ligada a pílulas de
+  categoria, que se abrem em um leque de linhas curvas até uma lista de itens; painel de detalhes de
+  vidro à direita. Inspira a Rede do Radar (centro → estratégias → ações em leque).
 - `ref5.png` — roda radial "neural" (base da Rede do Radar).
 
 Tokens principais (topo do `site/estilo.css`): fundo `#130c09`/`#140d0a`, laranja `--laranja-2`
