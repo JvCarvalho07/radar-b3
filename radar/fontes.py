@@ -2,7 +2,7 @@
 
 Fundamentos e histórico de 1 ano são baixados uma vez por dia e guardados em cache/;
 nas execuções seguintes do mesmo dia só os últimos pregões são atualizados. Isso evita
-bloqueios das fontes gratuitas quando o Radar roda a cada 15 minutos.
+bloqueios das fontes gratuitas quando o Radar roda a cada 5 minutos.
 """
 
 import io

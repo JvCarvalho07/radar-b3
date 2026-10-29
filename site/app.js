@@ -368,7 +368,7 @@ function telaInicio() {
             <div class="faint" id="ibov-per" style="margin-top:2px"></div></div>
           ${abasPeriodo("6M")}
         </div>
-        <div class="grafico" id="g-ibov">${ib?.serie ? "" : '<div class="vazio" style="margin:20px 6px">O Yahoo Finance não respondeu nesta atualização. O gráfico volta na próxima, em até 15 minutos.</div>'}</div>
+        <div class="grafico" id="g-ibov">${ib?.serie ? "" : '<div class="vazio" style="margin:20px 6px">O Yahoo Finance não respondeu nesta atualização. O gráfico volta na próxima, em poucos minutos durante o pregão.</div>'}</div>
       </section>
 
       <section class="painel olhar" id="olhar">
@@ -790,7 +790,7 @@ function telaWatchlist() {
   - { papel: PETR4 }
   - { papel: BBAS3, abaixo_de: 20.00 }
   - { papel: WEGE3, acima_de: 60.00 }</code></pre>
-      <p class="muted">Use ponto como separador decimal. Depois de salvar, a próxima atualização (em até 15 minutos no pregão) já usa a lista nova, e o aviso chega quando o preço cruza o nível, uma vez por cruzamento.</p>
+      <p class="muted">Use ponto como separador decimal. Depois de salvar, a próxima atualização (em poucos minutos durante o pregão) já usa a lista nova, e o aviso chega quando o preço cruza o nível, uma vez por cruzamento.</p>
     </section>${rodape()}`;
 }
 
@@ -829,7 +829,7 @@ function avisoPush() {
 
 function telaAlertas() {
   const regs = estado.historico;
-  tela.innerHTML = `${cabecalho("Alertas", `${regs.length} atualizações com mudança. O Radar confere as estratégias a cada 15 minutos de pregão e só avisa o que mudou.`)}
+  tela.innerHTML = `${cabecalho("Alertas", `${regs.length} atualizações com mudança. O Radar confere as estratégias a cada 5 minutos de pregão e só avisa o que mudou.`)}
     <section class="painel s8" style="align-self:start"><div class="painel-cabeca"><h2>Histórico</h2></div>
       ${regs.map((r) => `<h3 class="faint" style="margin:14px 0 4px;font-weight:500">${quando(r.em)}</h3>${eventos([r]).map(mudancaHTML).join("")}`).join("") || '<div class="vazio">Nenhum alerta ainda.</div>'}
     </section>
