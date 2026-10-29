@@ -103,7 +103,8 @@ def baixar_fundamentus() -> pd.DataFrame:
 
 
 # Campos que o Fundamentus não tem para bancos e seguradoras e manda como 0.
-NAO_SE_APLICA_FIN = ["psr", "ev_ebit", "ev_ebitda", "mrg_bruta", "mrg_ebit", "mrg_liq", "roic", "liq_corr", "div_liq_patrim"]
+NAO_SE_APLICA_FIN = ["psr", "p_cap_giro", "p_ebit", "p_ativ_circ_liq", "ev_ebit", "ev_ebitda", "mrg_bruta",
+                     "mrg_ebit", "mrg_liq", "roic", "liq_corr", "div_liq_patrim"]
 
 
 def _sem_zeros_de_banco(df: pd.DataFrame) -> pd.DataFrame:

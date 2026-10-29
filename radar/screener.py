@@ -24,9 +24,7 @@ PASTA_DADOS = RAIZ / "dados"
 FUSO = ZoneInfo("America/Sao_Paulo")
 
 CAMPOS_PRECO = {"queda_52s", "var_dia", "var_30d", "var_1a"}
-# Indicadores que o Fundamentus zera para bancos e seguradoras.
-NAO_SE_APLICA_FINANCEIRAS = {"div_liq_patrim", "liq_corr", "roic", "ev_ebit", "ev_ebitda",
-                             "mrg_bruta", "mrg_ebit", "p_ebit", "p_cap_giro", "p_ativ_circ_liq"}
+# Os indicadores que não existem para bancos ficam em fontes.NAO_SE_APLICA_FIN.
 
 # Rótulo e se o valor é percentual (para exibição).
 ROTULOS = {

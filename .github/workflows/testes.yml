@@ -1,0 +1,38 @@
+name: Testes
+
+# Separado do radar.yml de propósito: um teste quebrado avisa aqui, mas nunca para a coleta de dados.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: pip install -r requirements.txt
+
+      - name: Testes do Python (triagem, dados, versão do app)
+        run: python -m unittest discover -s testes -v
+
+      - name: Testes da carteira
+        run: node testes/carteira.test.js
+
+      - name: Sintaxe do app
+        run: for f in site/*.js; do node --check "$f"; done
