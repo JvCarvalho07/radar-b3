@@ -103,6 +103,27 @@ class PrecoJusto(unittest.TestCase):
         self.assertAlmostEqual(r["graham"], round(math.sqrt(22.5 * 2 * 10), 2))
         self.assertAlmostEqual(r["bazin"], 20)   # DPA 1,20 ÷ 6%
 
+    def test_dividendo_fora_do_normal(self):
+        # histórico desde 2022; janela dos 3 anos anteriores (out/2022 a out/2025): 1,00 por ano
+        anos = [["2022-06-01", 1.0], ["2023-06-01", 1.0], ["2024-06-01", 1.0], ["2025-06-01", 1.0]]
+        normal = {"dy": 15, "proventos_todos": anos + [["2026-06-01", 1.2]]}
+        extra = {"dy": 30, "proventos_todos": anos + [["2026-06-01", 3.0]]}
+        self.assertIsNone(analise.dividendo_fora_do_normal(normal, 8, hoje="2026-10-28"))
+        r = analise.dividendo_fora_do_normal(extra, 10, hoje="2026-10-28")
+        self.assertAlmostEqual(r["ultimo"], 3.0)
+        self.assertAlmostEqual(r["media"], 1.0)
+        # com o aviso, o preço-teto de Bazin (que supõe dividendo recorrente) não conta a favor
+        u = {**extra, "preco": 10, "bazin": 50}
+        with mock.patch.object(analise, "dividendo_fora_do_normal", return_value=r):
+            a_favor, atencao = analise.sinais(u, 0)
+        self.assertFalse(any("Bazin" in a["t"] for a in a_favor))
+        self.assertTrue(any("fora do normal" in a["t"] for a in atencao))
+
+    def test_dividendo_com_historico_curto(self):
+        curto = {"dy": 40, "proventos_todos": [["2025-12-01", 2.0], ["2026-05-01", 0.1]]}
+        self.assertIn("maior", analise.dividendo_fora_do_normal(curto, 5, hoje="2026-10-28"))
+        self.assertIsNone(analise.dividendo_fora_do_normal({**curto, "dy": 8}, 5, hoje="2026-10-28"))
+
     def test_sem_lucro_nao_tem_graham(self):
         self.assertNotIn("graham", analise.preco_justo(preco=20, pl=-5, pvp=2, dy=0))
 

@@ -96,6 +96,10 @@ def baixar_fundamentus() -> pd.DataFrame:
             f"O Fundamentus mudou o formato da tabela ({len(df.columns)} colunas, "
             f"esperado {len(COLUNAS_FUNDAMENTUS)}). Revise COLUNAS_FUNDAMENTUS."
         )
+    # Tabela cortada (o site respondeu pela metade) faria centenas de ações "saírem" das estratégias de uma
+    # vez, com alerta falso para todas. Melhor falhar a rodada: a próxima tenta de novo.
+    if len(df) < 500:
+        raise RuntimeError(f"O Fundamentus devolveu só {len(df)} ações (o normal é ~1000). Tentando de novo na próxima rodada.")
     df.columns = COLUNAS_FUNDAMENTUS
     for col in COLUNAS_FUNDAMENTUS[1:]:
         if df[col].dtype == object or str(df[col].dtype) == "str":

@@ -59,7 +59,17 @@ def sinais(u: dict, n_estrategias: int) -> tuple[list[dict], list[dict]]:
             a_favor.append({"t": "Abaixo do preço justo de Graham", "d": f"O preço justo calculado é R$ {u['graham']:.2f}, {pct(dif)} acima do preço atual."})
         elif dif <= -30:
             atencao.append({"t": "Bem acima do preço justo de Graham", "d": f"O preço justo calculado é R$ {u['graham']:.2f}; o preço atual está {(preco / u['graham'] - 1) * 100:.0f}% acima dele."})
-    if _ok(u.get("bazin")) and preco:
+    # Dividendo fora do normal: o que pagou em 12 meses é 2× ou mais a média dos 3 anos anteriores, e o DY passa
+    # de 12%. O DY de 12 meses e o preço-teto de Bazin supõem que o dividendo se repete; aqui eles enganam.
+    extra = dividendo_fora_do_normal(u, preco)
+    if extra:
+        comparacao = (f"contra uma média de R$ {extra['media']:.2f} por ano nos 3 anos anteriores "
+                      f"({extra['media'] / preco * 100:.1f}% no preço de hoje)" if "media" in extra else
+                      f"sendo R$ {extra['maior']:.2f} num único pagamento; a empresa tem menos de 4 anos de proventos para comparar")
+        atencao.append({"t": "Dividendo alto fora do normal",
+                        "d": f"Nos últimos 12 meses pagou R$ {extra['ultimo']:.2f} por ação (DY de {u['dy']:.1f}%), {comparacao}. "
+                             "Pagamento extraordinário costuma não se repetir."})
+    if _ok(u.get("bazin")) and preco and not extra:
         dif = (u["bazin"] / preco - 1) * 100
         if dif >= 0:
             a_favor.append({"t": "Abaixo do preço-teto de Bazin", "d": f"Pagando o dividendo atual, renderia {u['dy']:.1f}% ao ano, acima dos 6% de Bazin (teto R$ {u['bazin']:.2f})."})
@@ -135,3 +145,21 @@ def depois_do_ultimo_salto(hist: pd.DataFrame) -> pd.DataFrame:
     r = c / c.shift(1)
     saltos = r[(r >= 2) | (r <= 0.5)].index
     return hist[hist.index >= saltos[-1]] if len(saltos) else hist
+
+
+def dividendo_fora_do_normal(u: dict, preco, hoje: str | None = None) -> dict | None:
+    """Dividendos dos últimos 12 meses contra a média anual dos 3 anos anteriores (proventos_todos, já
+    ajustados por desdobramento). Só julga quem tem pelo menos 4 anos de histórico de proventos."""
+    todos = [(d, v) for d, v in (u.get("proventos_todos") or []) if _ok(v) and v > 0]
+    if not preco or not todos or not _ok(u.get("dy")) or u["dy"] < 12:
+        return None
+    hoje = pd.Timestamp(hoje) if hoje else pd.Timestamp.now().normalize()
+    ini12 = (hoje - pd.DateOffset(years=1)).strftime("%Y-%m-%d")
+    ini48 = (hoje - pd.DateOffset(years=4)).strftime("%Y-%m-%d")
+    ultimo = sum(v for d, v in todos if d >= ini12)
+    if min(d for d, _ in todos) > ini48:
+        # Histórico curto: sem média para comparar, só um pagamento único enorme (15% do preço ou mais) denuncia.
+        maior = max((v for d, v in todos if d >= ini12), default=0)
+        return {"ultimo": ultimo, "maior": maior} if maior / preco >= .15 else None
+    media = sum(v for d, v in todos if ini48 <= d < ini12) / 3
+    return {"ultimo": ultimo, "media": media} if ultimo >= 2 * media else None
