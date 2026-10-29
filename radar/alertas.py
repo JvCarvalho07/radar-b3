@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -51,10 +51,19 @@ def calcular_mudancas(resultado: dict, config: dict, universo: pd.DataFrame,
         entraram = sorted(set(atuais) - antes)
         sairam = sorted(antes - set(atuais))
         # Sem preço nesta rodada: continua no estado como estava e decide quando o preço voltar.
-        sem_preco = [p for p in sairam if _sem_preco(p, config["estrategias"][chave], universo)]
-        if sem_preco:
-            sairam = [p for p in sairam if p not in sem_preco]
-            novo["estrategias"][chave] = sorted(set(atuais) | set(sem_preco))
+        # Se o preço não volta em 24 h (ex.: ação deslistada), aí sim conta como saída.
+        desde_antes = (anterior.get("sem_preco") or {}).get(chave, {})
+        agora = datetime.fromisoformat(resultado["gerado_em"])
+        segurar = {}
+        for p in sairam:
+            if _sem_preco(p, config["estrategias"][chave], universo):
+                desde = desde_antes.get(p, resultado["gerado_em"])
+                if agora - datetime.fromisoformat(desde) < timedelta(hours=24):
+                    segurar[p] = desde
+        if segurar:
+            sairam = [p for p in sairam if p not in segurar]
+            novo["estrategias"][chave] = sorted(set(atuais) | set(segurar))
+            novo.setdefault("sem_preco", {})[chave] = segurar
         if not (entraram or sairam):
             continue
         linhas.append(f"[{est['nome']}]")

@@ -541,7 +541,7 @@ function telaLista() {
     ligarLinhas();
   };
   let esperaFiltro;
-  $("#lista-q").oninput = (e) => { estado.lista.q = e.target.value; clearTimeout(esperaFiltro); esperaFiltro = setTimeout(desenhar, 120); };
+  $("#lista-q").oninput = (e) => { estado.lista.q = e.target.value; clearTimeout(esperaFiltro); esperaFiltro = setTimeout(() => { if ($("#lista-q")) desenhar(); }, 120); };
   ligarAbas(tela, "setor", (x) => { estado.lista.setor = x; desenhar(); });
   desenhar();
 }
@@ -880,6 +880,7 @@ let sel = 0;
 // A busca trava o resto da página (inert) enquanto está aberta e devolve o foco para onde estava ao fechar.
 let focoAntesDaBusca = null;
 function abrirBusca() {
+  if (!$("#paleta").hidden) return;   // já aberta: não troca o foco que será devolvido
   focoAntesDaBusca = document.activeElement;
   $("#paleta").hidden = false; $("#app").inert = true;
   $("#paleta-input").value = ""; filtrar(); $("#paleta-input").focus();

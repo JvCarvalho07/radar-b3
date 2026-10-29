@@ -161,10 +161,20 @@ class Alertas(unittest.TestCase):
     CONFIG = {"estrategias": {"caiu": {"nome": "Caiu demais", "criterios": [
         {"campo": "pl", "min": 0.5, "max": 15}, {"campo": "queda_52s", "min": 30}]}}}
 
-    def _rodada(self, universo, membros, anterior, watchlist=()):
-        resultado = {"estrategias": {"caiu": {"nome": "Caiu demais", "papeis": [
+    def _rodada(self, universo, membros, anterior, watchlist=(), em="2026-10-28T12:00:00-03:00"):
+        resultado = {"gerado_em": em, "estrategias": {"caiu": {"nome": "Caiu demais", "papeis": [
             {"papel": p, "preco": 10.0, "motivos": ["ok"]} for p in membros]}}, "watchlist": list(watchlist)}
         return alertas.calcular_mudancas(resultado, self.CONFIG, universo, anterior)
+
+    def test_sem_preco_por_mais_de_um_dia_vira_saida(self):
+        universo = pd.DataFrame({"pl": [8.0], "queda_52s": [NAN], "financeira": [False]}, index=["XYZ3"])
+        _, novo = self._rodada(universo, [], {"estrategias": {"caiu": ["XYZ3"]}})
+        self.assertEqual(novo["sem_preco"]["caiu"]["XYZ3"], "2026-10-28T12:00:00-03:00")
+        linhas, _ = self._rodada(universo, [], novo, em="2026-10-28T18:00:00-03:00")
+        self.assertEqual(linhas, [])                                   # 6 h depois: ainda segura
+        linhas, novo2 = self._rodada(universo, [], novo, em="2026-10-29T12:30:00-03:00")
+        self.assertTrue(any(l.startswith("- XYZ3 saiu") for l in linhas))   # mais de 24 h: saiu
+        self.assertEqual(novo2["estrategias"]["caiu"], [])
 
     def test_sem_preco_nao_e_saida(self):
         """O Yahoo não devolveu o preço de XYZ3 nesta rodada: nada de "saiu" (e depois "entrou")."""

@@ -23,7 +23,7 @@ function normalizarCarteira(bruto) {
     let id = typeof l.id === "string" && /^[\w-]{1,64}$/.test(l.id) ? l.id : novoId();
     if (ids.has(id)) id = novoId();
     ids.add(id);
-    const estrategias = Array.isArray(l.estrategias) ? l.estrategias.filter((e) => typeof e === "string" && /^\w{1,40}$/.test(e)) : [];
+    const estrategias = Array.isArray(l.estrategias) ? l.estrategias.filter((e) => typeof e === "string" && /^[\p{L}\p{N}_-]{1,40}$/u.test(e)) : [];
     lancamentos.push({ id, criado: Number(l.criado) || 0, tipo, papel, data, qtd, preco, taxas, estrategias });
   }
   const carteira = { lancamentos };
