@@ -173,8 +173,9 @@ def motivo_saida(papel: str, est: dict, universo: pd.DataFrame) -> str:
 
 
 def _float(v):
+    """Número limpo para o JSON: sem NaN e sem o ruído de precisão do Yahoo (23.139999389648438 → 23.14)."""
     try:
         f = float(v)
-        return None if math.isnan(f) else f
+        return None if math.isnan(f) else round(f, 4)
     except (TypeError, ValueError):
         return None

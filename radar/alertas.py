@@ -8,7 +8,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from .screener import PASTA_DADOS, RAIZ, fmt_num, motivo_saida
+from .screener import CAMPOS_PRECO, PASTA_DADOS, RAIZ, criterios_para, fmt_num, motivo_saida
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +26,16 @@ def _ler_estado() -> dict | None:
     return None
 
 
+def _sem_preco(papel: str, est: dict, universo: pd.DataFrame) -> bool:
+    """O papel só ficou de fora porque o Yahoo não devolveu o preço desta vez (regra de preço sem dado).
+    Isso não é saída de verdade: avisar "saiu" agora e "entrou" na próxima rodada seria alarme falso."""
+    if papel not in universo.index:
+        return False
+    linha = universo.loc[papel]
+    crit = criterios_para(est, bool(linha.get("financeira")))
+    return bool(crit) and any(c["campo"] in CAMPOS_PRECO and pd.isna(linha.get(c["campo"])) for c in crit)
+
+
 def calcular_mudancas(resultado: dict, config: dict, universo: pd.DataFrame,
                       anterior: dict | None) -> tuple[list[str], dict]:
     """Gera as linhas do alerta e o novo estado a ser salvo."""
@@ -40,6 +50,11 @@ def calcular_mudancas(resultado: dict, config: dict, universo: pd.DataFrame,
         antes = set(anterior.get("estrategias", {}).get(chave, []))
         entraram = sorted(set(atuais) - antes)
         sairam = sorted(antes - set(atuais))
+        # Sem preço nesta rodada: continua no estado como estava e decide quando o preço voltar.
+        sem_preco = [p for p in sairam if _sem_preco(p, config["estrategias"][chave], universo)]
+        if sem_preco:
+            sairam = [p for p in sairam if p not in sem_preco]
+            novo["estrategias"][chave] = sorted(set(atuais) | set(sem_preco))
         if not (entraram or sairam):
             continue
         linhas.append(f"[{est['nome']}]")
@@ -53,7 +68,9 @@ def calcular_mudancas(resultado: dict, config: dict, universo: pd.DataFrame,
     estado_watch = (anterior or {}).get("watchlist", {})
     for w in resultado["watchlist"]:
         preco = w.get("preco")
-        if preco is None:
+        if preco is None:   # sem preço nesta rodada: guarda o que já tinha, para não repetir o alerta depois
+            if w["papel"] in estado_watch:
+                novo["watchlist"][w["papel"]] = estado_watch[w["papel"]]
             continue
         flags = {
             "abaixo": w.get("abaixo_de") is not None and preco <= w["abaixo_de"],
@@ -89,45 +106,73 @@ def _inscricoes() -> list[dict]:
     texto = texto.strip()
     if not texto:
         return []
+    # Uma linha estragada no secret não pode derrubar a rodada inteira: pula a linha e avisa qual foi.
     if texto.startswith("["):
-        return json.loads(texto)
-    return [json.loads(l) for l in texto.splitlines() if l.strip()]
+        try:
+            lista = json.loads(texto)
+            return [i for i in lista if isinstance(i, dict)] if isinstance(lista, list) else []
+        except json.JSONDecodeError:
+            log.error("PUSH_SUBSCRIPTIONS não é uma lista JSON válida; nenhuma notificação enviada.")
+            return []
+    inscricoes = []
+    for n, linha in enumerate(texto.splitlines(), 1):
+        if not linha.strip():
+            continue
+        try:
+            item = json.loads(linha)
+        except json.JSONDecodeError:
+            log.error("PUSH_SUBSCRIPTIONS: linha %d não é um código válido; pulei essa linha.", n)
+            continue
+        if isinstance(item, dict):
+            inscricoes.append(item)
+    return inscricoes
 
 
-def _chave_vapid() -> str | None:
-    """Caminho do arquivo da chave privada (variável VAPID_PRIVATE_KEY ou vapid_private.pem)."""
+def _tem_chave() -> bool:
+    return bool(os.getenv("VAPID_PRIVATE_KEY", "").strip()) or (RAIZ / "vapid_private.pem").exists()
+
+
+def _chave_vapid() -> tuple[str | None, bool]:
+    """Caminho do arquivo da chave privada e se ele é temporário (criado a partir de VAPID_PRIVATE_KEY,
+    que precisa ser apagado depois do envio)."""
     pem = os.getenv("VAPID_PRIVATE_KEY", "").strip()
     if pem:
         tmp = tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False)
         tmp.write(pem + "\n")
         tmp.close()
-        return tmp.name
+        return tmp.name, True
     arq = RAIZ / "vapid_private.pem"
-    return str(arq) if arq.exists() else None
+    return (str(arq), False) if arq.exists() else (None, False)
 
 
 def enviar_push(titulo: str, corpo: str) -> dict:
     """Envia a notificação para todos os aparelhos e devolve um resumo do envio."""
-    inscricoes, chave = _inscricoes(), _chave_vapid()
-    status = {"configurado": bool(inscricoes and chave), "inscricoes": len(inscricoes),
+    inscricoes = _inscricoes()
+    status = {"configurado": bool(inscricoes and _tem_chave()), "inscricoes": len(inscricoes),
               "enviadas": 0, "expiradas": 0}
     if not status["configurado"]:
         return status
     from pywebpush import WebPushException, webpush
 
+    chave, temporaria = _chave_vapid()
     carga = json.dumps({"titulo": titulo, "corpo": corpo, "url": "./#alertas"}, ensure_ascii=False)
-    for insc in inscricoes:
-        try:
-            webpush(insc, carga, vapid_private_key=chave, vapid_claims={"sub": URL_APP}, ttl=6 * 3600)
-            status["enviadas"] += 1
-        except WebPushException as erro:
-            codigo = getattr(erro.response, "status_code", None)
-            if codigo in (404, 410):
-                status["expiradas"] += 1  # o aparelho desinscreveu ou a inscrição venceu
-            else:
-                log.error("Falha no push (%s): %s", codigo, erro)
-        except Exception as erro:  # rede, inscrição malformada etc.
-            log.error("Falha no push: %s", erro)
+    try:
+        for n, insc in enumerate(inscricoes, 1):
+            try:
+                webpush(insc, carga, vapid_private_key=chave, vapid_claims={"sub": URL_APP}, ttl=6 * 3600)
+                status["enviadas"] += 1
+            except WebPushException as erro:
+                codigo = getattr(erro.response, "status_code", None)
+                if codigo in (404, 410):
+                    status["expiradas"] += 1  # o aparelho desinscreveu ou a inscrição venceu
+                else:
+                    # Os logs do Actions são públicos: só o código, nunca o endereço do aparelho.
+                    log.error("Falha no push do aparelho %d (HTTP %s).", n, codigo)
+            except Exception as erro:  # rede, inscrição malformada etc.
+                log.error("Falha no push do aparelho %d (%s).", n, type(erro).__name__)
+    finally:
+        if temporaria:
+            os.unlink(chave)
     return status
 
 
@@ -136,7 +181,7 @@ def processar(resultado: dict, config: dict, universo: pd.DataFrame, enviar_aler
     PASTA_DADOS.mkdir(exist_ok=True)
     anterior = _ler_estado()
     linhas, novo_estado = calcular_mudancas(resultado, config, universo, anterior)
-    status_push = (anterior or {}).get("push") or {"configurado": bool(_inscricoes() and _chave_vapid()),
+    status_push = (anterior or {}).get("push") or {"configurado": bool(_inscricoes() and _tem_chave()),
                                                    "inscricoes": len(_inscricoes())}
 
     if linhas:
@@ -162,5 +207,10 @@ def processar(resultado: dict, config: dict, universo: pd.DataFrame, enviar_aler
 def ler_historico(limite=100) -> list[dict]:
     if not ARQ_HISTORICO.exists():
         return []
-    linhas = ARQ_HISTORICO.read_text(encoding="utf-8").splitlines()
-    return [json.loads(l) for l in linhas[-limite:] if l.strip()][::-1]
+    regs = []
+    for l in ARQ_HISTORICO.read_text(encoding="utf-8").splitlines()[-limite:]:
+        try:
+            regs.append(json.loads(l))
+        except json.JSONDecodeError:
+            continue   # linha vazia ou cortada (rodada interrompida no meio da gravação)
+    return regs[::-1]

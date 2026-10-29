@@ -9,7 +9,8 @@ import io
 import logging
 import pickle
 import warnings
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import pandas as pd
@@ -36,9 +37,15 @@ COLUNAS_FUNDAMENTUS = [
 ]
 
 
+def _hoje() -> date:
+    """Data de hoje em Brasília. O robô roda em UTC: depois das 21h o date.today() já seria amanhã,
+    e a rodada das 18h10 baixaria tudo de novo com um cache novo."""
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+
+
 def _cache(nome: str) -> Path:
     PASTA_CACHE.mkdir(exist_ok=True)
-    return PASTA_CACHE / f"{nome}_{date.today():%Y-%m-%d}.pkl"
+    return PASTA_CACHE / f"{nome}_{_hoje():%Y-%m-%d}.pkl"
 
 
 def _ler_cache(arq: Path):
@@ -54,7 +61,7 @@ def _ler_cache(arq: Path):
 
 
 def _limpar_cache_antigo():
-    hoje = f"{date.today():%Y-%m-%d}"
+    hoje = f"{_hoje():%Y-%m-%d}"
     for arq in PASTA_CACHE.glob("*.pkl"):
         if hoje not in arq.name:
             arq.unlink(missing_ok=True)
@@ -170,22 +177,27 @@ def baixar_perfis(papeis) -> dict[str, dict]:
     """Nome, setor e alvo de preço dos analistas (Yahoo Finance), com cache de 1 dia."""
     from concurrent.futures import ThreadPoolExecutor
 
+    import time
+
     arq = _cache("perfis")
     cache = _ler_cache(arq) or {}
-    faltando = sorted(set(papeis) - set(cache))
+    agora = time.time()
+    # Falha (limite de acesso do Yahoo, sem rede) não fica guardada o dia todo: tenta de novo depois de 30 min.
+    falhou = lambda p: isinstance(cache.get(p), dict) and "_falha" in cache[p]
+    faltando = sorted(p for p in set(papeis) if p not in cache or (falhou(p) and agora - cache[p]["_falha"] > 30 * 60))
 
     def um(papel):
         try:
             info = yf.Ticker(f"{papel}.SA").info
             return papel, {novo: info.get(velho) for velho, novo in CAMPOS_PERFIL.items()}
         except Exception as erro:  # sem cobertura, limite de acesso etc.
-            log.info("Sem perfil para %s: %s", papel, erro)
-            return papel, {}
+            log.info("Sem perfil para %s: %s", papel, type(erro).__name__)
+            return papel, {"_falha": agora}
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         cache.update(dict(pool.map(um, faltando)))
     arq.write_bytes(pickle.dumps(cache))
-    return {p: cache.get(p, {}) for p in papeis}
+    return {p: ({} if falhou(p) else cache.get(p, {})) for p in papeis}
 
 
 def baixar_eventos(papeis) -> dict:
@@ -320,7 +332,7 @@ def serie_bova11():
     try:
         # auto_adjust (padrão do yfinance) desconta os proventos: a série mede o retorno total
         bova = yf.Ticker("BOVA11.SA").history(period="5y")["Close"].dropna()
-        hoje = f"{date.today():%Y-%m-%d}"   # o pregão de hoje ainda muda; entra depois pelo Ibovespa
+        hoje = f"{_hoje():%Y-%m-%d}"   # o pregão de hoje ainda muda; entra depois pelo Ibovespa
         serie = [[d.strftime("%Y-%m-%d"), round(float(v), 4)] for d, v in bova.items() if d.strftime("%Y-%m-%d") < hoje]
     except Exception as erro:
         log.warning("Falha ao obter BOVA11: %s", erro)
@@ -351,7 +363,7 @@ def serie_dolar() -> list:
     em_cache = _ler_cache(arq)
     if em_cache:
         return em_cache
-    fim = date.today()
+    fim = _hoje()
     inicio = fim - pd.Timedelta(days=370)
     url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
            "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
@@ -383,7 +395,7 @@ MOEDAS = {
 
 
 def _ptax_moeda(moeda: str) -> dict | None:
-    fim = date.today()
+    fim = _hoje()
     inicio = fim - pd.Timedelta(days=10)
     url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
            "CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"
@@ -434,7 +446,7 @@ def baixar_mundo() -> dict:
 
 def _dolar_ptax() -> dict:
     """Última PTAX (oficial do Banco Central) e variação contra o dia útil anterior."""
-    fim = date.today()
+    fim = _hoje()
     inicio = fim - pd.Timedelta(days=10)
     url = ("https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
            "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)"

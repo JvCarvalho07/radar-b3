@@ -6,14 +6,16 @@ Não acessam a internet: só funções puras com dados de mentira.
 """
 
 import math
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
-from radar import analise, fontes, publicar, screener
+from radar import alertas, analise, fontes, publicar, screener
 
 NAN = float("nan")
 
@@ -125,6 +127,55 @@ class Velas(unittest.TestCase):
 
     def test_salto_de_2x_e_suspeito(self):
         self.assertTrue(analise.suspeito(velas([10.0] * 10 + [20.0] * 10)))
+
+
+class Alertas(unittest.TestCase):
+    CONFIG = {"estrategias": {"caiu": {"nome": "Caiu demais", "criterios": [
+        {"campo": "pl", "min": 0.5, "max": 15}, {"campo": "queda_52s", "min": 30}]}}}
+
+    def _rodada(self, universo, membros, anterior, watchlist=()):
+        resultado = {"estrategias": {"caiu": {"nome": "Caiu demais", "papeis": [
+            {"papel": p, "preco": 10.0, "motivos": ["ok"]} for p in membros]}}, "watchlist": list(watchlist)}
+        return alertas.calcular_mudancas(resultado, self.CONFIG, universo, anterior)
+
+    def test_sem_preco_nao_e_saida(self):
+        """O Yahoo não devolveu o preço de XYZ3 nesta rodada: nada de "saiu" (e depois "entrou")."""
+        universo = pd.DataFrame({"pl": [8.0], "queda_52s": [NAN], "financeira": [False]}, index=["XYZ3"])
+        linhas, novo = self._rodada(universo, [], {"estrategias": {"caiu": ["XYZ3"]}})
+        self.assertEqual(linhas, [])
+        self.assertEqual(novo["estrategias"]["caiu"], ["XYZ3"])
+
+    def test_saida_de_verdade_avisa(self):
+        universo = pd.DataFrame({"pl": [8.0], "queda_52s": [12.0], "financeira": [False]}, index=["XYZ3"])
+        linhas, novo = self._rodada(universo, [], {"estrategias": {"caiu": ["XYZ3"]}})
+        self.assertTrue(any(l.startswith("- XYZ3 saiu") for l in linhas))
+        self.assertEqual(novo["estrategias"]["caiu"], [])
+
+    def test_alerta_de_preco_nao_repete_depois_de_rodada_sem_preco(self):
+        universo = pd.DataFrame({"pl": [8.0], "queda_52s": [40.0], "financeira": [False]}, index=["XYZ3"])
+        w = {"papel": "BBAS3", "abaixo_de": 20.0, "acima_de": None}
+        anterior = {"estrategias": {"caiu": ["XYZ3"]}, "watchlist": {"BBAS3": {"abaixo": True, "acima": False}}}
+        _, novo = self._rodada(universo, ["XYZ3"], anterior, [{**w, "preco": None}])
+        self.assertEqual(novo["watchlist"]["BBAS3"], {"abaixo": True, "acima": False})
+        linhas, _ = self._rodada(universo, ["XYZ3"], novo, [{**w, "preco": 19.0}])
+        self.assertFalse(any("BBAS3" in l for l in linhas))
+
+    def test_secret_com_linha_estragada_nao_derruba(self):
+        bom = '{"endpoint": "https://exemplo/1", "keys": {}}'
+        with mock.patch.dict(os.environ, {"PUSH_SUBSCRIPTIONS": bom + "\nisso não é json\n" + bom}):
+            self.assertEqual(len(alertas._inscricoes()), 2)
+        with mock.patch.dict(os.environ, {"PUSH_SUBSCRIPTIONS": "[quebrado"}):
+            self.assertEqual(alertas._inscricoes(), [])
+
+
+class DataDeBrasilia(unittest.TestCase):
+    def test_cache_usa_a_data_de_brasilia(self):
+        """Às 22h de Brasília já é 1h do dia seguinte em UTC; o cache tem que continuar sendo o de hoje."""
+        from datetime import datetime, timezone
+        utc = datetime(2026, 10, 29, 1, 0, tzinfo=timezone.utc)
+        with mock.patch.object(fontes, "datetime") as dt:
+            dt.now.side_effect = lambda tz=None: utc.astimezone(tz)
+            self.assertEqual(str(fontes._hoje()), "2026-10-28")
 
 
 class CarimboDeVersao(unittest.TestCase):
