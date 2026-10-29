@@ -246,6 +246,13 @@ celular) antes de publicar.
 | `f1f5639` | Ação com escala quebrada (AZUL3) publica o gráfico só a partir do último salto; tabelas ordenáveis pelo teclado; título da aba por tela; filtro da lista mais leve |
 | `38a31c2` | Aviso "Dividendo alto fora do normal" (12 meses ≥ 2× a média dos 3 anos anteriores, DY > 12%), e Bazin deixa de contar a favor nesses casos; rodada falha se o Fundamentus vier cortado (< 500 ações) |
 
+| `8b6c409` | Feriados da B3 (`feriados_b3.txt`, calendário oficial de 2026): robô não encadeia rodadas em feriado; app usa a hora de Brasília e mostra "Feriado na B3" em vez de "atrasado". **Em janeiro, acrescente os feriados de 2027** (a B3 publica no começo do ano) |
+| `37eb45a` | Globo: busca do país sob o mouse uma vez por quadro; Brasil aparece como base das cotações |
+| `e68ecbf` | Textos do app falavam em rodadas de 15 min; agora 5 |
+
+Também conferido: todas as telas cabem em 375 px de largura (celular) sem rolagem lateral; o app baixa
+~190 KB comprimidos para abrir.
+
 Conferência depois de cada mudança no Python: os dados publicados foram comparados com uma cópia de
 antes (quantidade de ações em cada estratégia e campos vazios). Nenhuma estratégia mudou sem querer.
 
@@ -260,5 +267,16 @@ antes (quantidade de ações em cada estratégia e campos vazios). Nenhuma estra
   entra porque falta a queda de 52 semanas.
 - **Dividend yield inflado por pagamento extraordinário** (ALLD3 58%, RIAA3 52%, GRND3 41%…): o teto
   de 25% em Valor e dividendos já barra; em Caiu demais aparece o DY alto. Some em janeiro de 2027.
+
+- **Histerese nas regras de preço:** uma ação perto do limite (ex.: queda de 29,8% ↔ 30,1% em Caiu
+  demais) entra e sai a cada rodada, gerando notificações repetidas. Opção: entrar com 30% e só sair
+  abaixo de 28%. Muda o comportamento das regras, então fica para o dono decidir.
+
+### Ideias para depois (não urgentes)
+
+- Tirar o histórico de 10 anos de proventos (`proventos_todos`) do `universo.json` para um arquivo
+  separado, carregado só pela carteira: o arquivo principal cairia de ~97 KB para ~69 KB comprimidos.
+  Mexe nas contas da carteira, então pede cuidado e testes.
+- Nomes de países do globo em português (hoje vêm em inglês do mapa-múndi, ex.: "Germany").
 
 (continua)
