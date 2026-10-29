@@ -75,6 +75,8 @@ function rotear() {
   const telas = { inicio: telaInicio, estrategias: telaEstrategias, acao: telaAcao, watchlist: telaWatchlist, carteira: telaCarteira, alertas: telaAlertas };
   const nome = telas[aba] ? aba : "inicio";
   $$("#menu a").forEach((a) => a.classList.toggle("ativa", a.dataset.aba === nome));
+  const TITULOS = { inicio: "", estrategias: "Estratégias", acao: arg ? arg.toUpperCase() : "Ações", watchlist: "Watchlist", carteira: "Carteira", alertas: "Alertas" };
+  document.title = TITULOS[nome] ? `${TITULOS[nome]} · Radar B3` : "Radar B3";
   estado.graficos.forEach((g) => g.remove());
   estado.graficos = [];
   estado.pararGlobo?.();
@@ -488,7 +490,7 @@ function desenharEstrategia() {
     <div class="painel-cabeca"><h2>${esc(e.descricao)}</h2></div>
     <p class="muted" style="font-size:13px;line-height:20px;margin:-6px 0 6px">Critérios: ${esc(e.criterios.map(textoCriterio).join(" · "))}.</p>
     <p class="faint" style="margin-bottom:16px">Bancos e seguradoras: ${e.criterios_financeiras ? esc(e.criterios_financeiras.map(textoCriterio).join(" · ")) : "ficam de fora desta estratégia"}. Para mudar, edite o config.yaml.</p>
-    ${linhas.length ? `<div class="rolagem"><table><thead><tr>${COLUNAS.map(([c, r, k]) => `<th class="ord ${k} ${o.campo === c ? "on" : ""}" data-ord="${c}">${r}${o.campo === c ? (o.desc ? " ↓" : " ↑") : ""}</th>`).join("")}</tr></thead>
+    ${linhas.length ? `<div class="rolagem"><table><thead><tr>${COLUNAS.map(([c, r, k]) => `<th class="ord ${k} ${o.campo === c ? "on" : ""}" data-ord="${c}" tabindex="0" aria-sort="${o.campo === c ? (o.desc ? "descending" : "ascending") : "none"}">${r}${o.campo === c ? (o.desc ? " ↓" : " ↑") : ""}</th>`).join("")}</tr></thead>
       <tbody>${linhas.map((l) => `<tr data-href="#acao/${esc(l.papel)}">
         <td>${ativoCel(l.papel)}</td><td class="n">${num(l.preco)}</td><td class="n">${varCel(l.var_dia)}</td>
         <td class="n esconde-celular">${num(l.pl, 1)}</td><td class="n esconde-celular">${l.dy == null ? "—" : num(l.dy, 1) + "%"}</td>
@@ -529,7 +531,7 @@ function telaLista() {
       .map(([p, u]) => ({ ...u, papel: p, setor: SETORES[u.setor] || u.setor || "", preco: precoDe(p) }))
       .sort((a, b) => { const x = a[o.campo], y = b[o.campo]; const r = typeof x === "string" || typeof y === "string" ? String(x ?? "").localeCompare(String(y ?? "")) : (x ?? -1e9) - (y ?? -1e9); return o.desc ? -r : r; });
     $("#lista-conta").textContent = `${linhas.length} ${linhas.length === 1 ? "ação" : "ações"}`;
-    $("#lista-cab").innerHTML = COLUNAS_LISTA.map(([c, r, k]) => `<th class="ord ${k} ${o.campo === c ? "on" : ""}" data-ord="${c}">${r}${o.campo === c ? (o.desc ? " ↓" : " ↑") : ""}</th>`).join("");
+    $("#lista-cab").innerHTML = COLUNAS_LISTA.map(([c, r, k]) => `<th class="ord ${k} ${o.campo === c ? "on" : ""}" data-ord="${c}" tabindex="0" aria-sort="${o.campo === c ? (o.desc ? "descending" : "ascending") : "none"}">${r}${o.campo === c ? (o.desc ? " ↓" : " ↑") : ""}</th>`).join("");
     $("#lista-corpo").innerHTML = linhas.map((l) => `<tr data-href="#acao/${esc(l.papel)}"><td>${ativoCel(l.papel)}</td><td class="esconde-celular faint">${esc(l.setor)}</td>
       <td class="n">${num(l.preco)}</td><td class="n">${varCel(l.var_dia)}</td><td class="n esconde-celular">${varCel(l.var_30d, 1)}</td>
       <td class="n esconde-celular">${num(l.pl, 1)}</td><td class="n esconde-celular">${l.dy == null ? "—" : num(l.dy, 1) + "%"}</td><td class="n esconde-celular">${l.roe == null ? "—" : num(l.roe, 1) + "%"}</td>
@@ -538,7 +540,8 @@ function telaLista() {
     $$("[data-ord]").forEach((th) => th.onclick = () => { const c = th.dataset.ord; o.desc = o.campo === c ? !o.desc : !["papel", "setor"].includes(c); o.campo = c; desenhar(); });
     ligarLinhas();
   };
-  $("#lista-q").oninput = (e) => { estado.lista.q = e.target.value; desenhar(); };
+  let esperaFiltro;
+  $("#lista-q").oninput = (e) => { estado.lista.q = e.target.value; clearTimeout(esperaFiltro); esperaFiltro = setTimeout(desenhar, 120); };
   ligarAbas(tela, "setor", (x) => { estado.lista.setor = x; desenhar(); });
   desenhar();
 }
@@ -1016,3 +1019,10 @@ if ("serviceWorker" in navigator) {
 tela.innerHTML = `<header class="titulo"><div><h1>Radar B3</h1><div class="carregando" style="width:320px"></div></div></header><section class="painel s8"><div class="carregando"></div><div class="carregando" style="width:40%"></div></section><section class="painel s4"><div class="carregando"></div></section>`;
 carregar();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) conferirNovidades(); });
+document.addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches?.("th[data-ord]")) {
+    const ord = e.target.dataset.ord;
+    e.preventDefault(); e.target.click();
+    $(`th[data-ord="${ord}"]`)?.focus();   // a tabela foi redesenhada: o foco volta para a mesma coluna
+  }
+});

@@ -125,3 +125,13 @@ def suspeito(hist: pd.DataFrame) -> bool:
         r = c / c.shift(1)
         return bool(((r >= 2) | (r <= 0.5)).any())
     return tem_salto(hist["Close"]) or tem_salto(velas_validas(hist)["Close"])
+
+
+def depois_do_ultimo_salto(hist: pd.DataFrame) -> pd.DataFrame:
+    """Só as velas a partir do último salto de 2× (ou de metade) entre pregões seguidos. Usado no gráfico das
+    ações com escala quebrada (grupamento que o Yahoo não ajustou): antes do salto os preços estão em outra
+    escala e o gráfico mostraria um penhasco que não aconteceu."""
+    c = hist["Close"].where(hist["Close"] > 0).dropna()
+    r = c / c.shift(1)
+    saltos = r[(r >= 2) | (r <= 0.5)].index
+    return hist[hist.index >= saltos[-1]] if len(saltos) else hist

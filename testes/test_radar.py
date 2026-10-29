@@ -128,6 +128,13 @@ class Velas(unittest.TestCase):
     def test_salto_de_2x_e_suspeito(self):
         self.assertTrue(analise.suspeito(velas([10.0] * 10 + [20.0] * 10)))
 
+    def test_grafico_comeca_depois_do_ultimo_salto(self):
+        """Grupamento sem ajuste (7 → 341, depois 217 → 30): o gráfico fica só com o trecho final."""
+        h = velas([7.0] * 5 + [341.0] * 5 + [30.0] * 6)
+        self.assertEqual(list(analise.depois_do_ultimo_salto(h)["Close"]), [30.0] * 6)
+        normal = velas([10 + i * 0.1 for i in range(20)])
+        self.assertEqual(len(analise.depois_do_ultimo_salto(normal)), 20)
+
 
 class Alertas(unittest.TestCase):
     CONFIG = {"estrategias": {"caiu": {"nome": "Caiu demais", "criterios": [

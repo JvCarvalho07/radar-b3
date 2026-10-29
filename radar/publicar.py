@@ -109,6 +109,8 @@ def gerar(resultado: dict, universo: pd.DataFrame, historicos: dict, saida: Path
     _json(dados / "universo.json", tabela)
 
     for papel, hist in historicos.items():
+        if tabela.get(papel, {}).get("escala_quebrada"):
+            hist = analise.depois_do_ultimo_salto(hist)   # o gráfico mostra só o trecho com escala coerente
         velas = [[d.strftime("%Y-%m-%d"), *(round(float(x), 2) for x in row[:4]), int(row[4] or 0)]
                  for d, row in zip(hist.index, hist[["Open", "High", "Low", "Close", "Volume"]].fillna(0).values)]
         _json(dados / "precos" / f"{papel}.json", velas)
