@@ -242,6 +242,13 @@ celular) antes de publicar.
 | `15b9948` | Carteira: arquivo importado e dados salvos são conferidos linha a linha (bloqueia código injetado e `__proto__`); salvar/apagar/importar só mudam a tela se o navegador salvou; gráfico do patrimônio usa a mesma conta dos cartões (day trade e grupamento); ação sem arquivo de preços não apaga o gráfico; alertas de topo e de estratégia contam só a posição atual |
 | `69cc47f` | App: voltar ao app não recarrega tudo (não perde formulário aberto); trava de rolagem da folha não sobra; falha de rede não apaga a tela; gráficos não desenham a ação antiga por cima da nova; botão Alvo/Preço justo volta a funcionar; globo e mapa mais robustos no celular; offline com fontes e ícones; busca acessível por teclado |
 
+| `8946c97` | Robô: ação sem preço numa rodada não gera "saiu" + "entrou" falsos; alerta de preço não se repete; estado e cache salvos mesmo se um passo posterior falhar (evita notificação repetida); secret de push estragado não derruba a rodada; logs públicos sem endereço dos aparelhos; chave temporária apagada; perfil que falhou é tentado de novo em 30 min; cache pela data de Brasília |
+| `f1f5639` | Ação com escala quebrada (AZUL3) publica o gráfico só a partir do último salto; tabelas ordenáveis pelo teclado; título da aba por tela; filtro da lista mais leve |
+| `38a31c2` | Aviso "Dividendo alto fora do normal" (12 meses ≥ 2× a média dos 3 anos anteriores, DY > 12%), e Bazin deixa de contar a favor nesses casos; rodada falha se o Fundamentus vier cortado (< 500 ações) |
+
+Conferência depois de cada mudança no Python: os dados publicados foram comparados com uma cópia de
+antes (quantidade de ações em cada estratégia e campos vazios). Nenhuma estratégia mudou sem querer.
+
 ### Achados que dependem do dono (não mexi: são regras de investimento)
 
 - **Holdings e seguradoras fora da detecção de "financeira":** BRAP4, CXSE3, ITSA3/4, PSSA3, BRBI11
