@@ -228,4 +228,30 @@ Testes automáticos: veja a seção "Testes" no fim deste relatório (atualizada
 O dono pediu: "faça tudo o que conseguir para melhorar o radar até as 11h". O que foi feito nesta
 sessão está listado abaixo e é atualizado ao longo da noite.
 
-(em andamento)
+Método: 4 auditorias em paralelo (backend, app, carteira, dados publicados), cada achado conferido no
+código antes de corrigir; testes automáticos para o que foi corrigido; teste no navegador (computador e
+celular) antes de publicar.
+
+### Feito
+
+| Commit | O que mudou |
+|---|---|
+| `67d9118`, `a7a788d` | Este relatório, `CLAUDE.md` (a próxima sessão do Claude lê sozinha), imagens de referência copiadas para `referencias/` |
+| `57e52b7` | Testes automáticos: `testes/test_radar.py` (Python) e `testes/carteira.test.js`, rodando no workflow separado `testes.yml` (um teste quebrado nunca para a coleta) |
+| `4558ba9` | README atualizado (rodadas de 5 min, instalação, testes) |
+| `15b9948` | Carteira: arquivo importado e dados salvos são conferidos linha a linha (bloqueia código injetado e `__proto__`); salvar/apagar/importar só mudam a tela se o navegador salvou; gráfico do patrimônio usa a mesma conta dos cartões (day trade e grupamento); ação sem arquivo de preços não apaga o gráfico; alertas de topo e de estratégia contam só a posição atual |
+| `69cc47f` | App: voltar ao app não recarrega tudo (não perde formulário aberto); trava de rolagem da folha não sobra; falha de rede não apaga a tela; gráficos não desenham a ação antiga por cima da nova; botão Alvo/Preço justo volta a funcionar; globo e mapa mais robustos no celular; offline com fontes e ícones; busca acessível por teclado |
+
+### Achados que dependem do dono (não mexi: são regras de investimento)
+
+- **Holdings e seguradoras fora da detecção de "financeira":** BRAP4, CXSE3, ITSA3/4, PSSA3, BRBI11
+  e BBSE3 passam pelas regras de empresa comum, mas números como margem líquida e dívida líquida não
+  fazem sentido para elas (ex.: ITSA4 com margem de 215%). Reclassificar muda quem entra em Valor e
+  dividendos (hoje ITSA4, PSSA3 e BRBI11 entram). Opção: lista explícita no `config.yaml`.
+- **Exigir P/VP > 0 nas regras de empresas comuns:** hoje é o `pl ≥ 0,5` que barra empresas com
+  patrimônio negativo (ROE sem sentido, ex.: RAIZ4 241%, BHIA3 160%). AZUL3 escapa do P/L e só não
+  entra porque falta a queda de 52 semanas.
+- **Dividend yield inflado por pagamento extraordinário** (ALLD3 58%, RIAA3 52%, GRND3 41%…): o teto
+  de 25% em Valor e dividendos já barra; em Caiu demais aparece o DY alto. Some em janeiro de 2027.
+
+(continua)
