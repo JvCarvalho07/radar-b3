@@ -241,20 +241,35 @@ celular) antes de publicar.
 | `4558ba9` | README atualizado (rodadas de 5 min, instalação, testes) |
 | `15b9948` | Carteira: arquivo importado e dados salvos são conferidos linha a linha (bloqueia código injetado e `__proto__`); salvar/apagar/importar só mudam a tela se o navegador salvou; gráfico do patrimônio usa a mesma conta dos cartões (day trade e grupamento); ação sem arquivo de preços não apaga o gráfico; alertas de topo e de estratégia contam só a posição atual |
 | `69cc47f` | App: voltar ao app não recarrega tudo (não perde formulário aberto); trava de rolagem da folha não sobra; falha de rede não apaga a tela; gráficos não desenham a ação antiga por cima da nova; botão Alvo/Preço justo volta a funcionar; globo e mapa mais robustos no celular; offline com fontes e ícones; busca acessível por teclado |
-
 | `8946c97` | Robô: ação sem preço numa rodada não gera "saiu" + "entrou" falsos; alerta de preço não se repete; estado e cache salvos mesmo se um passo posterior falhar (evita notificação repetida); secret de push estragado não derruba a rodada; logs públicos sem endereço dos aparelhos; chave temporária apagada; perfil que falhou é tentado de novo em 30 min; cache pela data de Brasília |
 | `f1f5639` | Ação com escala quebrada (AZUL3) publica o gráfico só a partir do último salto; tabelas ordenáveis pelo teclado; título da aba por tela; filtro da lista mais leve |
-| `38a31c2` | Aviso "Dividendo alto fora do normal" (12 meses ≥ 2× a média dos 3 anos anteriores, DY > 12%), e Bazin deixa de contar a favor nesses casos; rodada falha se o Fundamentus vier cortado (< 500 ações) |
-
-| `8b6c409` | Feriados da B3 (`feriados_b3.txt`, calendário oficial de 2026): robô não encadeia rodadas em feriado; app usa a hora de Brasília e mostra "Feriado na B3" em vez de "atrasado". **Em janeiro, acrescente os feriados de 2027** (a B3 publica no começo do ano) |
-| `37eb45a` | Globo: busca do país sob o mouse uma vez por quadro; Brasil aparece como base das cotações |
+| `38a31c2` | Aviso "Dividendo alto fora do normal" (12 meses ≥ 2× a média dos 3 anos anteriores, DY > 12%; com menos de 4 anos de histórico, um pagamento único ≥ 15% do preço), e Bazin deixa de contar a favor nesses casos; rodada falha se o Fundamentus vier cortado (< 500 ações) |
+| `8b6c409` | Feriados da B3 (`feriados_b3.txt`, calendário oficial de 2026): robô não encadeia rodadas em feriado (o agendamento de reserva continua rodando, sem efeito); app usa a hora de Brasília e mostra "Feriado na B3" em vez de "atrasado". **Em janeiro, acrescente os feriados de 2027** (a B3 publica no começo do ano) |
+| `37eb45a`, `43efba9` | Globo: busca do país sob o mouse uma vez por quadro; Brasil aparece como base das cotações; nomes dos países em português do Brasil |
 | `e68ecbf` | Textos do app falavam em rodadas de 15 min; agora 5 |
+| `8fb3b34` | Prévia com nome e ícone ao compartilhar o link (WhatsApp etc.) |
+| `70c6787` | Ajustes da revisão final: ação sem preço segura no estado por no máximo 24 h; pequenos erros de foco e de console |
 
-Também conferido: todas as telas cabem em 375 px de largura (celular) sem rolagem lateral; o app baixa
-~190 KB comprimidos para abrir.
+Também conferido:
 
-Conferência depois de cada mudança no Python: os dados publicados foram comparados com uma cópia de
-antes (quantidade de ações em cada estratégia e campos vazios). Nenhuma estratégia mudou sem querer.
+- Todas as telas cabem em 375 px de largura (celular) sem rolagem lateral; o app baixa ~190 KB
+  comprimidos para abrir.
+- Depois de cada mudança no Python, os dados publicados foram comparados com uma cópia de antes
+  (quantidade de ações em cada estratégia e campos vazios). Nenhuma estratégia mudou sem querer.
+- Uma revisão independente de todas as mudanças da noite não achou perda de dados: tudo o que o
+  formulário antigo da carteira já salvou passa na nova conferência.
+
+### Testes
+
+```bash
+.venv/Scripts/python -m unittest discover -s testes -v
+```
+
+```bash
+node testes/carteira.test.js
+```
+
+28 testes no Python e 21 na carteira. Rodam sozinhos no GitHub a cada push (workflow *Testes*).
 
 ### Achados que dependem do dono (não mexi: são regras de investimento)
 
@@ -265,18 +280,13 @@ antes (quantidade de ações em cada estratégia e campos vazios). Nenhuma estra
 - **Exigir P/VP > 0 nas regras de empresas comuns:** hoje é o `pl ≥ 0,5` que barra empresas com
   patrimônio negativo (ROE sem sentido, ex.: RAIZ4 241%, BHIA3 160%). AZUL3 escapa do P/L e só não
   entra porque falta a queda de 52 semanas.
-- **Dividend yield inflado por pagamento extraordinário** (ALLD3 58%, RIAA3 52%, GRND3 41%…): o teto
-  de 25% em Valor e dividendos já barra; em Caiu demais aparece o DY alto. Some em janeiro de 2027.
-
 - **Histerese nas regras de preço:** uma ação perto do limite (ex.: queda de 29,8% ↔ 30,1% em Caiu
   demais) entra e sai a cada rodada, gerando notificações repetidas. Opção: entrar com 30% e só sair
-  abaixo de 28%. Muda o comportamento das regras, então fica para o dono decidir.
+  abaixo de 28%.
 
 ### Ideias para depois (não urgentes)
 
 - Tirar o histórico de 10 anos de proventos (`proventos_todos`) do `universo.json` para um arquivo
   separado, carregado só pela carteira: o arquivo principal cairia de ~97 KB para ~69 KB comprimidos.
   Mexe nas contas da carteira, então pede cuidado e testes.
-- Nomes de países do globo em português (hoje vêm em inglês do mapa-múndi, ex.: "Germany").
-
-(continua)
+- Fazer o agendamento de reserva também pular os feriados (hoje só o encadeamento pula).
