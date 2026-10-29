@@ -45,11 +45,13 @@
   ],
   "caiu_demais": [
    "ALLD3",
+   "ALPA4",
    "ASAI3",
    "B3SA3",
    "BBDC3",
    "BBDC4",
    "BLAU3",
+   "BMOB3",
    "BRBI11",
    "BRSR6",
    "CEAB3",
@@ -93,6 +95,8 @@
    "SMFT3",
    "TEND3",
    "TFCO4",
+   "TGMA3",
+   "TOTS3",
    "TRIS3",
    "TTEN3",
    "VIVA3",
@@ -151,6 +155,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-10-28T21:54:00-03:00"
+  "em": "2026-10-29T15:47:10-03:00"
  }
 }
