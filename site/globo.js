@@ -173,18 +173,26 @@ async function montarGlobo(slot) {
     const f = +b.dataset.zoom;
     if (f) zoom(proj.scale() * f); else { proj.scale(escalaBase); irPara("076"); }
   });
+  // Procurar o país sob o mouse testa ~177 contornos: no máximo uma vez por quadro de animação.
+  let ultimoEv = null, quadroMouse = 0;
   tela.addEventListener("pointermove", (ev) => {
+    ultimoEv = ev;
+    if (!quadroMouse) quadroMouse = requestAnimationFrame(() => { quadroMouse = 0; sobMouse(ultimoEv); });
+  });
+  const sobMouse = (ev) => {
     const r = tela.getBoundingClientRect(), ponto = proj.invert([ev.clientX - r.left, ev.clientY - r.top]);
     const f = ponto && d3.geoDistance(ponto, [-proj.rotate()[0], -proj.rotate()[1]]) < Math.PI / 2 ? paises.find((p) => d3.geoContains(p, ponto)) : null;
     const id = f?.id || null;
     if (id !== realce) { realce = id; agendar(); }
     if (!f) { dicaEl.classList.remove("on"); return; }
     const d = dado(f.id);
-    dicaEl.innerHTML = `<b>${esc(d?.pais || f.properties.name)}</b>${d ? `${esc(d.nome)}${modo === "moedas" ? ` · ${reais(d.valor, d.valor < 1 ? 4 : 3)}` : ""}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
+    if (f.id === "076" && !d) {   // Brasil: o real é a moeda de referência de tudo no globo
+      dicaEl.innerHTML = `<b>Brasil</b><span class="faint">${modo === "moedas" ? "o real é a base das cotações" : "veja o Ibovespa ao lado"}</span>`;
+    } else dicaEl.innerHTML = `<b>${esc(d?.pais || f.properties.name)}</b>${d ? `${esc(d.nome)}${modo === "moedas" ? ` · ${reais(d.valor, d.valor < 1 ? 4 : 3)}` : ""}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
     dicaEl.style.left = `${ev.clientX - r.left}px`; dicaEl.style.top = `${ev.clientY - r.top}px`;
     dicaEl.classList.add("on");
-  });
-  tela.addEventListener("pointerleave", () => { dicaEl.classList.remove("on"); realce = null; agendar(); });
+  };
+  tela.addEventListener("pointerleave", () => { cancelAnimationFrame(quadroMouse); quadroMouse = 0; dicaEl.classList.remove("on"); realce = null; agendar(); });
   $("#destaques-globo").addEventListener("click", (ev) => { const b = ev.target.closest("[data-iso]"); if (b) { realce = b.dataset.iso; irPara(b.dataset.iso); } });
   ligarAbas(caixa, "modo", (m) => { modo = m; pintarLista(); agendar(); });
   estado.pararGlobo = () => { alvo = null; };
