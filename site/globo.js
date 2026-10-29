@@ -5,6 +5,18 @@ const LIBS_GLOBO = [
   "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
 ];
 const MAPA_MUNDO = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json";
+// Código numérico do mapa-múndi (ISO 3166) + sigla de 2 letras, de 5 em 5 caracteres. O nome em português
+// do Brasil vem do próprio navegador (Intl.DisplayNames); o mapa traz os nomes em inglês.
+const SIGLAS_PAISES = "004AF008AL010AQ012DZ024AO031AZ032AR036AU040AT044BS050BD051AM056BE064BT068BO070BA072BW076BR084BZ090SB096BN100BG104MM108BI112BY116KH120CM124CA140CF144LK148TD152CL156CN158TW170CO178CG180CD188CR191HR192CU196CY203CZ204BJ208DK214DO218EC222SV226GQ231ET232ER233EE238FK242FJ246FI250FR260TF262DJ266GA268GE270GM275PS276DE288GH300GR304GL320GT324GN328GY332HT340HN348HU352IS356IN360ID364IR368IQ372IE376IL380IT384CI388JM392JP398KZ400JO404KE408KP410KR414KW417KG418LA422LB426LS428LV430LR434LY440LT442LU450MG454MW458MY466ML478MR484MX496MN498MD499ME504MA508MZ512OM516NA524NP528NL540NC548VU554NZ558NI562NE566NG578NO586PK591PA598PG600PY604PE608PH616PL620PT624GW626TL630PR634QA642RO643RU646RW682SA686SN688RS694SL703SK704VN705SI706SO710ZA716ZW724ES728SS729SD732EH740SR748SZ752SE756CH760SY762TJ764TH768TG780TT784AE788TN792TR795TM800UG804UA807MK818EG826GB834TZ840US854BF858UY860UZ862VE887YE894ZM";
+const NOMES_PT = (() => {
+  try {
+    const nome = new Intl.DisplayNames(["pt-BR"], { type: "region" }), m = {};
+    for (let i = 0; i < SIGLAS_PAISES.length; i += 5) m[SIGLAS_PAISES.slice(i, i + 3)] = nome.of(SIGLAS_PAISES.slice(i + 3, i + 5));
+    return m;
+  } catch { return {}; }
+})();
+const SEM_CODIGO = { "N. Cyprus": "Chipre do Norte", Somaliland: "Somalilândia", Kosovo: "Kosovo" };
+const nomePais = (f) => NOMES_PT[f.id] || SEM_CODIGO[f.properties.name] || f.properties.name;
 const LEGENDAS = {
   bolsas: "Cor = quanto o principal índice de cada país variou no último pregão. Verde subiu, vermelho caiu.",
   moedas: "Cor = quanto cada moeda variou contra o real. Vermelho: a moeda caiu, ou seja, o real ficou mais forte. Verde: a moeda subiu e o real enfraqueceu.",
@@ -188,7 +200,7 @@ async function montarGlobo(slot) {
     const d = dado(f.id);
     if (f.id === "076" && !d) {   // Brasil: o real é a moeda de referência de tudo no globo
       dicaEl.innerHTML = `<b>Brasil</b><span class="faint">${modo === "moedas" ? "o real é a base das cotações" : "veja o Ibovespa ao lado"}</span>`;
-    } else dicaEl.innerHTML = `<b>${esc(d?.pais || f.properties.name)}</b>${d ? `${esc(d.nome)}${modo === "moedas" ? ` · ${reais(d.valor, d.valor < 1 ? 4 : 3)}` : ""}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
+    } else dicaEl.innerHTML = `<b>${esc(d?.pais || nomePais(f))}</b>${d ? `${esc(d.nome)}${modo === "moedas" ? ` · ${reais(d.valor, d.valor < 1 ? 4 : 3)}` : ""}: <span class="${cls(d.var)}">${sinal(d.var)}</span>` : '<span class="faint">sem dado</span>'}`;
     dicaEl.style.left = `${ev.clientX - r.left}px`; dicaEl.style.top = `${ev.clientY - r.top}px`;
     dicaEl.classList.add("on");
   };
