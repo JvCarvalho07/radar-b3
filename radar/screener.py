@@ -42,6 +42,14 @@ ROTULOS = {
 }
 
 
+def feriados_b3(caminho=RAIZ / "feriados_b3.txt") -> list[str]:
+    """Dias sem pregão (feriados_b3.txt). O app usa para não mostrar "atrasado" num feriado."""
+    if not caminho.exists():
+        return []
+    linhas = (l.strip() for l in caminho.read_text(encoding="utf-8").splitlines())
+    return sorted(l for l in linhas if l and not l.startswith("#"))
+
+
 def carregar_config(caminho=RAIZ / "config.yaml") -> dict:
     with open(caminho, encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -156,6 +164,7 @@ def rodar(config: dict | None = None) -> tuple[dict, pd.DataFrame, dict]:
         "estrategias": resultados,
         "watchlist": watch,
         "mercado": fontes.resumo_mercado(),
+        "feriados": feriados_b3(),
     }
     return resultado, universo, historicos
 

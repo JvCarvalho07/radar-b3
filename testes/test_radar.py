@@ -196,6 +196,14 @@ class Alertas(unittest.TestCase):
             self.assertEqual(alertas._inscricoes(), [])
 
 
+class Feriados(unittest.TestCase):
+    def test_lista_de_feriados_valida(self):
+        f = screener.feriados_b3()
+        self.assertIn("2026-11-02", f)
+        for d in f:
+            self.assertRegex(d, r"^\d{4}-\d{2}-\d{2}$")
+
+
 class DataDeBrasilia(unittest.TestCase):
     def test_cache_usa_a_data_de_brasilia(self):
         """Às 22h de Brasília já é 1h do dia seguinte em UTC; o cache tem que continuar sendo o de hoje."""

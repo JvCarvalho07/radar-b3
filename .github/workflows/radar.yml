@@ -100,7 +100,9 @@ jobs:
         run: |
           dia=$(TZ=America/Sao_Paulo date +%u)
           hora=$((10#$(TZ=America/Sao_Paulo date +%H%M)))
-          if [ "$dia" -le 5 ] && [ "$hora" -ge 955 ] && [ "$hora" -lt 1805 ]; then
+          if grep -qx "$(TZ=America/Sao_Paulo date +%F)" feriados_b3.txt; then
+            echo "Feriado na B3: sem rodadas encadeadas hoje."
+          elif [ "$dia" -le 5 ] && [ "$hora" -ge 955 ] && [ "$hora" -lt 1805 ]; then
             sleep 150
             gh workflow run radar.yml --repo "$GITHUB_REPOSITORY" --ref main
           else

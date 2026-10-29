@@ -947,11 +947,15 @@ async function conferirNovidades() {
 function marcarIdade() {
   if (!estado.resultado) return;
   const min = Math.round((Date.now() - new Date(estado.resultado.gerado_em)) / 60000);
-  const agora = new Date(), dia = agora.getDay(), h = agora.getHours() + agora.getMinutes() / 60;
-  const pregao = dia > 0 && dia < 6 && h >= 10 && h < 18.2;
+  // Hora de Brasília (não a do aparelho, que pode estar em outro fuso) e feriados da B3
+  const b = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", weekday: "short", hourCycle: "h23" }).formatToParts(new Date()).map((p) => [p.type, p.value]));
+  const h = Number(b.hour) + Number(b.minute) / 60, util = !["Sat", "Sun"].includes(b.weekday);
+  const feriado = (estado.resultado.feriados || []).includes(`${b.year}-${b.month}-${b.day}`);
+  const pregao = util && !feriado && h >= 10 && h < 18.2;
   const velho = pregao && min > 30;
   const txt = min < 1 ? "Atualizado agora" : min < 60 ? `Atualizado há ${min} min` : `Atualizado ${quando(estado.resultado.gerado_em)}`;
-  $("#status-texto").textContent = velho ? `${txt} · atrasado` : txt;
+  $("#status-texto").textContent = velho ? `${txt} · atrasado` : util && feriado ? `Feriado na B3 · ${txt}` : txt;
   $("#status-menu").classList.toggle("atrasado", velho);
 }
 setInterval(conferirNovidades, 60000);
