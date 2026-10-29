@@ -3,7 +3,38 @@
 const CHAVE_CARTEIRA = "radar-carteira-v1";
 
 function lerCarteira() {
-  try { return JSON.parse(localStorage.getItem(CHAVE_CARTEIRA)) || { lancamentos: [] }; } catch { return { lancamentos: [] }; }
+  try { return normalizarCarteira(JSON.parse(localStorage.getItem(CHAVE_CARTEIRA))).carteira; } catch { return { lancamentos: [] }; }
+}
+
+// Confere cada operação antes de usar (vale para o que está salvo e para arquivo importado): só entra o que
+// tem tipo, código, data, quantidade e preço válidos. Isso impede que um arquivo malicioso injete código na
+// tela ou quebre as contas. O código fracionário (PETR4F) vira o da ação (PETR4).
+const novoId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function normalizarCarteira(bruto) {
+  const lista = Array.isArray(bruto?.lancamentos) ? bruto.lancamentos : [];
+  const lancamentos = [], ids = new Set();
+  for (const l of lista) {
+    if (!l || typeof l !== "object") continue;
+    const tipo = l.tipo === "compra" || l.tipo === "venda" ? l.tipo : null;
+    const papel = String(l.papel ?? "").trim().toUpperCase().replace(/^([A-Z][A-Z0-9]{3}\d{1,2})F$/, "$1");
+    const data = String(l.data ?? ""), qtd = Number(l.qtd), preco = Number(l.preco), taxas = Number(l.taxas || 0);
+    if (!tipo || !/^[A-Z][A-Z0-9]{3}\d{1,2}$/.test(papel) || !/^\d{4}-\d{2}-\d{2}$/.test(data)
+      || !Number.isInteger(qtd) || qtd <= 0 || !(preco > 0) || !(taxas >= 0)) continue;
+    let id = typeof l.id === "string" && /^[\w-]{1,64}$/.test(l.id) ? l.id : novoId();
+    if (ids.has(id)) id = novoId();
+    ids.add(id);
+    const estrategias = Array.isArray(l.estrategias) ? l.estrategias.filter((e) => typeof e === "string" && /^\w{1,40}$/.test(e)) : [];
+    lancamentos.push({ id, criado: Number(l.criado) || 0, tipo, papel, data, qtd, preco, taxas, estrategias });
+  }
+  const carteira = { lancamentos };
+  const s = bruto?.saida;
+  if (s && typeof s === "object") {
+    // Só as regras que vieram; as que faltam ficam no padrão (SAIDA_PADRAO).
+    carteira.saida = {};
+    for (const k of ["estrategia", "alvo", "graham"]) if (k in s) carteira.saida[k] = s[k] !== false;
+    for (const k of ["quedaTopo", "quedaPM", "pesoMax"]) if (k in s) carteira.saida[k] = Math.min(100, Math.max(0, Number(s[k]) || 0));
+  }
+  return { carteira, descartadas: lista.length - lancamentos.length };
 }
 function salvarCarteira(c) {
   try { localStorage.setItem(CHAVE_CARTEIRA, JSON.stringify(c)); return true; } catch { return false; }
@@ -44,7 +75,7 @@ function calcularCarteira(lancamentos) {
   }
   // No mesmo dia, o desdobramento vem antes das operações (criado 0 contra 1).
   const ordem = [...eventos, ...blocos.values()].sort((a, b) => a.data.localeCompare(b.data) || a.criado - b.criado);
-  const pos = {}, vendasMes = {}, dayMes = {}, fluxos = [];
+  const pos = Object.create(null), vendasMes = Object.create(null), dayMes = Object.create(null), fluxos = [];
   let realizado = 0, excesso = 0;
   for (const it of ordem) {
     if (it.tipo === "desdobramento") {
@@ -151,27 +182,30 @@ function serieCarteira(lancamentos, velasPor) {
   const datas = [...new Set(papeis.flatMap((p) => (velasPor[p] || []).map((v) => v[0])))].filter((d) => d >= primeira).sort();
   if (datas.length < 2) return null;
   const fech = Object.fromEntries(papeis.map((p) => [p, new Map((velasPor[p] || []).map((v) => [v[0], v[4]]))]));
-  const ops = [...lancamentos].sort((a, b) => a.data.localeCompare(b.data));
-  // Custo das posições abertas logo depois de cada data com operação
-  const custoEm = new Map();
-  for (const d of [...new Set(ops.map((l) => l.data))]) custoEm.set(d, calcularCarteira(ops.filter((l) => l.data <= d)).abertas.reduce((s, p) => s + p.custo, 0));
-  const qtd = {}, ultimo = {}, serie = [];
-  let i = 0, custo = 0;
+  // Ação sem nenhuma vela (arquivo de preços faltando) fica fora do gráfico, em vez de apagar todos os dias.
+  const semVelas = papeis.filter((p) => !(velasPor[p] || []).length);
+  // Quantidade e custo de cada ação logo depois de cada data com operação, pela mesma conta dos cartões
+  // (day trade compensado, grupamento com ações inteiras), para o gráfico bater com o resto da tela.
+  const posEm = new Map();
+  for (const d of [...new Set(lancamentos.map((l) => l.data))].sort()) {
+    const c = calcularCarteira(lancamentos.filter((l) => l.data <= d));
+    const noGrafico = c.abertas.filter((p) => !semVelas.includes(p.papel));
+    posEm.set(d, { qtd: Object.fromEntries(noGrafico.map((p) => [p.papel, p.qtd])), custo: noGrafico.reduce((s, p) => s + p.custo, 0) });
+  }
+  const datasOp = [...posEm.keys()];
+  let qtd = {}, custo = 0, i = 0;
+  const ultimo = {}, serie = [];
   for (const d of datas) {
-    for (; i < ops.length && ops[i].data <= d; i++) {
-      const l = ops[i], q = l.qtd * fatorApos(l.papel, l.data);
-      qtd[l.papel] = Math.max(0, (qtd[l.papel] || 0) + (l.tipo === "compra" ? q : -q));
-      custo = custoEm.get(l.data);
-    }
+    for (; i < datasOp.length && datasOp[i] <= d; i++) ({ qtd, custo } = posEm.get(datasOp[i]));
     let valor = 0, falta = false;
     for (const p of papeis) {
       const f = fech[p].get(d);
       if (f != null) ultimo[p] = f;
-      if (qtd[p] > 0) { if (ultimo[p] == null) falta = true; else valor += qtd[p] * ultimo[p]; }
+      if (qtd[p] > 0 && !semVelas.includes(p)) { if (ultimo[p] == null) falta = true; else valor += qtd[p] * ultimo[p]; }
     }
     if (!falta) serie.push({ time: d, valor, custo });
   }
-  return serie.length >= 2 ? { serie, parcial: primeira < datas[0] } : null;
+  return serie.length >= 2 ? { serie, parcial: primeira < datas[0], semVelas } : null;
 }
 
 async function montarGraficoCarteira(cart) {
@@ -208,7 +242,8 @@ async function montarGraficoCarteira(cart) {
     sCusto.setData(parte.map((x) => ({ time: x.time, value: x.custo })));
     g.timeScale().fitContent();
     const ini = parte[0], fim = parte.at(-1);
-    $("#cart-desde").textContent = `${r.parcial && per === "Tudo" ? "desde o início dos dados do app, " : ""}${dataBR(ini.time)} a ${dataBR(fim.time)}`;
+    $("#cart-desde").textContent = `${r.parcial && per === "Tudo" ? "desde o início dos dados do app, " : ""}${dataBR(ini.time)} a ${dataBR(fim.time)}`
+      + (r.semVelas.length ? ` · sem histórico de preço: ${r.semVelas.join(", ")} (fora do gráfico)` : "");
   };
   ligarAbas($("#cart-periodo"), "cper", mostrar);
   mostrar("Tudo");
@@ -367,10 +402,10 @@ function telaCarteira() {
       <details>
         <summary><h2>Histórico de operações</h2><span class="extra">${cart.lancamentos.length} ${cart.lancamentos.length === 1 ? "operação" : "operações"}</span><i class="ti ti-chevron-down"></i></summary>
         <div class="rolagem" style="margin-top:14px"><table><thead><tr><th>Data</th><th>Tipo</th><th>Ação</th><th class="n">Qtd.</th><th class="n">Preço</th><th class="n esconde-celular">Total</th><th></th></tr></thead><tbody>
-          ${[...cart.lancamentos].sort((a, b) => b.data.localeCompare(a.data) || b.criado - a.criado).map((l) => `<tr class="sem-link"><td>${dataBR(l.data)}</td>
-            <td><span class="pilula ${l.tipo === "compra" ? "pos" : "neg"}">${l.tipo}</span></td><td><b>${esc(l.papel)}</b></td><td class="n">${num(l.qtd, 0)}</td>
+          ${[...cart.lancamentos].sort((a, b) => b.data.localeCompare(a.data) || b.criado - a.criado).map((l) => `<tr class="sem-link"><td>${esc(dataBR(l.data))}</td>
+            <td><span class="pilula ${l.tipo === "compra" ? "pos" : "neg"}">${esc(l.tipo)}</span></td><td><b>${esc(l.papel)}</b></td><td class="n">${num(l.qtd, 0)}</td>
             <td class="n">${reais(l.preco)}</td><td class="n esconde-celular">${reais(l.qtd * l.preco + (l.tipo === "compra" ? 1 : -1) * (l.taxas || 0))}</td>
-            <td class="n"><button type="button" class="apagar-op" data-id="${l.id}" aria-label="Apagar operação"><i class="ti ti-trash"></i></button></td></tr>`).join("")}
+            <td class="n"><button type="button" class="apagar-op" data-id="${esc(l.id)}" aria-label="Apagar operação"><i class="ti ti-trash"></i></button></td></tr>`).join("")}
         </tbody></table></div>
       </details>
       <div class="acoes-carteira"><button class="botao contorno" type="button" id="exportar"><i class="ti ti-download"></i>Exportar</button>${importar}</div>
@@ -419,9 +454,11 @@ function telaCarteira() {
     }
     if (erro) { $("#erro-op").textContent = erro; return; }
     const estrategias = tipo === "compra" ? Object.entries(estado.resultado.estrategias).filter(([, e]) => e.papeis.some((x) => x.papel === base)).map(([k]) => k) : [];
-    cart.lancamentos.push({ id: crypto.randomUUID?.() || String(Date.now()), criado: Date.now(), tipo, papel: base, data, qtd, preco, taxas, estrategias });
+    // Só muda a carteira em memória depois de salvar: se falhar, apertar Salvar de novo não duplica a operação.
+    const nova = { ...cart, lancamentos: [...cart.lancamentos, { id: novoId(), criado: Date.now(), tipo, papel: base, data, qtd, preco, taxas, estrategias }] };
+    if (!salvarCarteira(nova)) { $("#erro-op").textContent = "Este navegador não deixou salvar (modo anônimo?). Exporte para não perder."; return; }
+    cart.lancamentos = nova.lancamentos;
     estado.saidasCache = null;
-    if (!salvarCarteira(cart)) { $("#erro-op").textContent = "Este navegador não deixou salvar (modo anônimo?). Exporte para não perder."; return; }
     document.body.classList.remove("com-folha");
     telaCarteira();
   };
@@ -429,9 +466,8 @@ function telaCarteira() {
     const restantes = cart.lancamentos.filter((l) => l.id !== b.dataset.id);
     if (calcularCarteira(restantes).excesso > c.excesso) { alert("Não dá para apagar: uma venda depois dela ficaria sem ações. Apague ou corrija a venda primeiro."); return; }
     if (!confirm("Apagar esta operação da carteira?")) return;
-    cart.lancamentos = restantes;
+    if (!salvarCarteira({ ...cart, lancamentos: restantes })) { alert("Este navegador não deixou salvar (modo anônimo?). A operação continua na carteira."); return; }
     estado.saidasCache = null;
-    salvarCarteira(cart);
     telaCarteira();
   });
   const exportar = $("#exportar");
@@ -442,14 +478,19 @@ function telaCarteira() {
   };
   $("#importar").onchange = async (ev) => {
     try {
-      const dado = JSON.parse(await ev.target.files[0].text());
-      if (!Array.isArray(dado.lancamentos)) throw new Error("formato");
+      const bruto = JSON.parse(await ev.target.files[0].text());
+      if (!Array.isArray(bruto?.lancamentos)) throw new Error("formato");
+      const { carteira: dado, descartadas } = normalizarCarteira(bruto);
+      if (!dado.lancamentos.length) throw new Error("vazio");
       const sem = calcularCarteira(dado.lancamentos).excesso;   // vendas sem compra correspondente (dados antigos ou compra apagada)
-      const aviso = sem ? `Atenção: ${num(sem, 0)} ações vendidas não têm compra correspondente no arquivo. O lucro dessas vendas fica de fora. ` : "";
+      const aviso = (descartadas ? `${num(descartadas, 0)} ${descartadas === 1 ? "linha do arquivo foi ignorada" : "linhas do arquivo foram ignoradas"} por estarem incompletas ou inválidas. ` : "")
+        + (sem ? `Atenção: ${num(sem, 0)} ações vendidas não têm compra correspondente no arquivo. O lucro dessas vendas fica de fora. ` : "");
       if (!confirm(`${aviso}Substituir a carteira atual pelas ${dado.lancamentos.length} operações do arquivo?`)) return;
+      if (!salvarCarteira(dado)) { alert("Este navegador não deixou salvar (modo anônimo?). A carteira não foi trocada."); return; }
       estado.saidasCache = null;
-      salvarCarteira(dado); telaCarteira();
+      telaCarteira();
     } catch { alert("Arquivo inválido: use um arquivo exportado pelo Radar B3."); }
+    finally { ev.target.value = ""; }   // deixa escolher o mesmo arquivo de novo
   };
   ligarLinhas();
   if (cart.lancamentos.length) montarGraficoCarteira(cart);
@@ -484,7 +525,9 @@ async function avaliarSaidas(cart, comTopo = true) {
     const u = estado.universo[p.papel] || {}, preco = p.preco;
     if (preco == null) continue;
     const add = (regra, t, d) => alertas.push({ papel: p.papel, regra, t, d, chave: `${p.papel}:${regra}` });
-    const compras = cart.lancamentos.filter((l) => l.papel === p.papel && l.tipo === "compra");
+    // Só as compras da posição atual: se a pessoa zerou e comprou de novo, a história anterior não conta.
+    const zerou = p.eventos.filter((e) => e.qtd === 0).at(-1)?.data;
+    const compras = cart.lancamentos.filter((l) => l.papel === p.papel && l.tipo === "compra" && (!zerou || l.data > zerou));
     const ests = [...new Set(compras.flatMap((l) => l.estrategias || []))];
     if (cfg.estrategia && ests.length) {
       const ainda = ests.filter((k) => estado.resultado.estrategias[k]?.papeis.some((x) => x.papel === p.papel));

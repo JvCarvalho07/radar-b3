@@ -60,6 +60,37 @@ ok(perto(ib.v, ((1000 / 100 + 1000 / 110) * 121 - 2000) / 2000 * 100), "Ibovespa
   ok(!al.some((x) => x.regra === "peso"), "peso não dispara com 2 ações", al.map((x) => x.regra));
   al = await avaliarSaidas({ lancamentos: [L(1, "compra", "BBBB4", "2025-01-10", 10, 20), L(2, "compra", "CCCC3", "2025-01-10", 1, 30), L(3, "compra", "DDDD3", "2025-01-10", 1, 40), L(4, "compra", "EEEE3", "2025-01-10", 1, 10), L(5, "compra", "AAAA3", "2025-07-10", 1, 10)] }, false);
   ok(al.some((x) => x.regra === "peso" && x.papel === "BBBB4"), "peso dispara com 5 ações e concentração", al.map((x) => x.papel + ":" + x.regra));
+
+  // 8. arquivo importado é conferido: código, tipo, números; nada de HTML nem __proto__
+  const imp = normalizarCarteira({ lancamentos: [
+    L("a", "compra", "petr4f", "2025-01-10", 10, 30),
+    L("b", "<img src=x onerror=alert(1)>", "PETR4", "2025-01-10", 10, 30),
+    L('x"><img>', "compra", "VALE3", "2025-01-10", 5, 60),
+    L("c", "compra", "__proto__", "2025-01-10", 1, 1),
+    L("d", "compra", "BBAS3", "<b>2025</b>", 1, 1),
+    { id: "e", tipo: "compra", papel: "ITUB4", data: "2025-01-10", qtd: "100", preco: "40" },
+    L("f", "compra", "ITUB4", "2025-01-10", 1.5, 40),
+  ], saida: { pesoMax: "999", graham: false } });
+  ok(imp.descartadas === 4 && imp.carteira.lancamentos.length === 3, "importação descarta linhas inválidas", imp.descartadas);
+  ok(imp.carteira.lancamentos[0].papel === "PETR4", "PETR4F vira PETR4");
+  ok(imp.carteira.lancamentos[1].id !== 'x"><img>', "id com HTML é trocado");
+  ok(imp.carteira.lancamentos[2].qtd === 100 && imp.carteira.lancamentos[2].preco === 40, "números em texto viram número");
+  ok(imp.carteira.saida.pesoMax === 100 && imp.carteira.saida.graham === false && !("quedaTopo" in imp.carteira.saida),
+    "regras de saída limitadas; as que faltam ficam no padrão", imp.carteira.saida);
+  ok(({}).qtd === undefined, "nada vaza para Object.prototype");
+  ok(normalizarCarteira({}).carteira.lancamentos.length === 0 && normalizarCarteira(null).carteira.lancamentos.length === 0, "carteira salva estragada não quebra");
+
+  // 9. gráfico: day trade digitado ao contrário não cria posição fantasma
+  const vel = (p) => [["2025-01-10", p, p, p, p], ["2025-01-13", p, p, p, p]];
+  let s = serieCarteira([L(1, "venda", "BBBB4", "2025-01-10", 100, 20), L(2, "compra", "BBBB4", "2025-01-10", 100, 20)], { BBBB4: vel(20) });
+  ok(s && s.serie.at(-1).valor === 0, "day trade não deixa posição no gráfico", s && s.serie.at(-1));
+  // 10. grupamento: gráfico usa ações inteiras, como o cartão (105 a R$5, 1:10 → 10 ações)
+  s = serieCarteira([L(1, "compra", "GRUP3", "2025-01-10", 105, 5)], { GRUP3: [["2025-07-01", 50, 50, 50, 50], ["2025-07-02", 50, 50, 50, 50]] });
+  ok(s && s.serie.at(-1).valor === 500, "grupamento no gráfico bate com o cartão", s && s.serie.at(-1));
+  // 11. ação sem arquivo de preços não apaga o gráfico inteiro
+  s = serieCarteira([L(1, "compra", "BBBB4", "2025-01-10", 10, 20), L(2, "compra", "CCCC3", "2025-01-10", 10, 30)], { BBBB4: vel(20), CCCC3: [] });
+  ok(s && s.serie.at(-1).valor === 200 && s.serie.at(-1).custo === 200 && s.semVelas[0] === "CCCC3", "ação sem preços fica fora do gráfico", s && s.serie.at(-1));
+
   console.log(falhas ? falhas + " falha(s)" : "tudo certo");
   if (falhas) process.exitCode = 1;
 })();
