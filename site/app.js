@@ -51,7 +51,8 @@ async function carregar() {
       carregarJSON("dados/resultado.json"), carregarJSON("dados/historico.json"), carregarJSON("dados/universo.json"),
     ]);
   } catch {
-    tela.innerHTML = `<header class="titulo"><div><h1>Radar B3</h1><p class="linha2">Não foi possível carregar os dados. A próxima atualização acontece em até 15 minutos durante o pregão.</p></div></header>`;
+    if (estado.resultado) return;   // já tem dados na tela: mantém e tenta de novo depois
+    tela.innerHTML = `<header class="titulo"><div><h1>Radar B3</h1><p class="linha2">Não foi possível carregar os dados. Confira a internet; durante o pregão os dados são atualizados a cada poucos minutos.</p></div></header>`;
     return;
   }
   for (const w of estado.resultado.watchlist) estado.universo[w.papel] ??= { preco: w.preco, var_dia: w.var_dia, var_30d: w.var_30d, queda_52s: w.queda_52s };
@@ -66,6 +67,7 @@ estado.mexeuEm = 0;
 for (const ev of ["wheel", "touchstart", "keydown"]) window.addEventListener(ev, () => { estado.mexeuEm = Date.now(); }, { passive: true });
 function rotear() {
   if (!estado.resultado) return;
+  document.body.classList.remove("com-folha");   // a folha da carteira trava a rolagem; nunca pode sobrar em outra tela
   const rota = location.hash || "#inicio";
   if (estado.rotaAtual) estado.rolagens[estado.rotaAtual] = window.scrollY;
   estado.rotaAtual = rota;
@@ -77,7 +79,9 @@ function rotear() {
   estado.graficos = [];
   estado.pararGlobo?.();
   estado.pararGlobo = null;
-  telas[nome](arg && decodeURIComponent(arg));
+  let param = arg;
+  try { param = arg && decodeURIComponent(arg); } catch { /* link malformado: usa como veio */ }
+  telas[nome](param);
   ligarLinhas();
   // Volta ao ponto onde estava nesta tela; partes que carregam depois (gráficos, mapa) mudam a altura, então reaplica.
   const destino = estado.rolagens[rota] || 0;
@@ -253,8 +257,11 @@ function montarTopo(ib, us) {
     $("#ibov-per").innerHTML = `<span class="${cls(v)}">${sinal(v, 1)}</span> em ${periodo === "1A" ? "12 meses" : periodo === "1M" ? "1 mês" : periodo.replace("M", " meses")}`
       + (atual.papel ? ` · <a href="#acao/${esc(atual.papel)}" style="color:var(--laranja-2);font-weight:600">ver análise</a>` : "");
   };
+  let pedido = 0;
   const escolher = async (chave) => {
+    const meu = ++pedido;
     const dado = await (fontes[chave] ? fontes[chave]() : daAcao(chave));
+    if (meu !== pedido || !document.body.contains(el)) return;   // clicou em outra série ou saiu da tela
     if (!dado) { $("#topo-rotulo").textContent = "Sem dados para este gráfico nesta atualização."; return; }
     atual = dado;
     $("#topo-rotulo").textContent = dado.rotulo;
@@ -722,10 +729,11 @@ function comoCalculado(u, preco, temA) {
 }
 
 async function desenharGraficoAcao(papel) {
+  const rota = estado.rotaAtual;
   let velas;
   try { velas = await carregarJSON(`dados/precos/${papel}.json`); } catch { velas = null; }
   const el = $("#g-acao");
-  if (!el) return;
+  if (!el || estado.rotaAtual !== rota) return;   // a pessoa já foi para outra ação: não desenha a antiga por cima
   if (!velas || !window.LightweightCharts) { el.innerHTML = '<div class="vazio">Gráfico disponível para as ações das estratégias e da watchlist.</div>'; el.style.height = "auto"; return; }
   el.innerHTML = "";
   const g = grafico(el);
@@ -866,8 +874,18 @@ const rodape = () => `<p class="rodape-legal">Triagem pelos critérios definidos
 
 // ---------- Busca rápida (Ctrl K) ----------
 let sel = 0;
-function abrirBusca() { $("#paleta").hidden = false; $("#paleta-input").value = ""; filtrar(); $("#paleta-input").focus(); }
-function fecharBusca() { $("#paleta").hidden = true; }
+// A busca trava o resto da página (inert) enquanto está aberta e devolve o foco para onde estava ao fechar.
+let focoAntesDaBusca = null;
+function abrirBusca() {
+  focoAntesDaBusca = document.activeElement;
+  $("#paleta").hidden = false; $("#app").inert = true;
+  $("#paleta-input").value = ""; filtrar(); $("#paleta-input").focus();
+}
+function fecharBusca() {
+  if ($("#paleta").hidden) return;
+  $("#paleta").hidden = true; $("#app").inert = false;
+  if (focoAntesDaBusca?.isConnected) focoAntesDaBusca.focus({ preventScroll: true });
+}
 function filtrar() {
   const q = $("#paleta-input").value.trim().toUpperCase();
   const todos = Object.entries(estado.universo);
@@ -905,11 +923,16 @@ document.addEventListener("keydown", (e) => {
 // ---------- Atualização automática ----------
 // O robô do GitHub publica dados novos a cada 5 minutos de pregão. O app confere a cada minuto
 // e redesenha a tela atual sem perder a posição da rolagem quando chega algo novo.
+// Não redesenha enquanto a pessoa digita ou está com o formulário da carteira aberto (perderia o que digitou);
+// a próxima conferência tenta de novo.
+function ocupado() {
+  return document.activeElement?.matches?.("input, textarea, select") || document.body.classList.contains("com-folha");
+}
 async function conferirNovidades() {
   if (document.hidden || !estado.resultado) return;
   try {
     const novo = await carregarJSON("dados/resultado.json");
-    if (novo.gerado_em !== estado.resultado.gerado_em) {
+    if (novo.gerado_em !== estado.resultado.gerado_em && !ocupado()) {
       const y = window.scrollY;
       estado.rotaAtual = null;
       await carregar();
@@ -986,11 +1009,10 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!jaTinha) { jaTinha = true; return; }   // primeira instalação, não é versão nova
     // Espera se a pessoa estiver digitando ou com o formulário da carteira aberto
-    const digitando = () => document.activeElement?.matches?.("input, textarea, select") || document.body.classList.contains("com-folha");
-    const recarregar = () => { if (digitando()) setTimeout(recarregar, 3000); else location.reload(); };
+    const recarregar = () => { if (ocupado()) setTimeout(recarregar, 3000); else location.reload(); };
     recarregar();
   });
 }
 tela.innerHTML = `<header class="titulo"><div><h1>Radar B3</h1><div class="carregando" style="width:320px"></div></div></header><section class="painel s8"><div class="carregando"></div><div class="carregando" style="width:40%"></div></section><section class="painel s4"><div class="carregando"></div></section>`;
 carregar();
-document.addEventListener("visibilitychange", () => { if (!document.hidden && estado.resultado) carregar(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) conferirNovidades(); });

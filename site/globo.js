@@ -18,7 +18,9 @@ const carregarScript = (src) => new Promise((ok, erro) => {
   const ja = [...document.scripts].find((s) => s.src === src);
   if (ja) { ja.addEventListener("load", ok); ja.addEventListener("error", erro); return; }
   const s = document.createElement("script");
-  s.src = src; s.onload = () => { s.dataset.ok = "1"; ok(); }; s.onerror = erro;
+  s.crossOrigin = "anonymous";   // resposta legível, para o service worker guardar e funcionar offline
+  // Se falhar, tira o script morto da página: senão a próxima tentativa esperaria para sempre por ele.
+  s.src = src; s.onload = () => { s.dataset.ok = "1"; ok(); }; s.onerror = () => { s.remove(); erro(); };
   document.head.appendChild(s);
 });
 
@@ -148,7 +150,12 @@ async function montarGlobo(slot) {
     agendar();
   }));
   const zoom = (k) => { proj.scale(Math.max(escalaBase * .8, Math.min(escalaBase * 7, k))); agendar(); };
-  tela.addEventListener("wheel", (ev) => { ev.preventDefault(); zoom(proj.scale() * (ev.deltaY < 0 ? 1.12 : .89)); }, { passive: false });
+  // A roda só segura a página enquanto o zoom muda; no limite, a página volta a rolar normalmente.
+  tela.addEventListener("wheel", (ev) => {
+    const antes = proj.scale();
+    zoom(antes * (ev.deltaY < 0 ? 1.12 : .89));
+    if (proj.scale() !== antes) ev.preventDefault();
+  }, { passive: false });
   // Girar suavemente até um país (lista ao lado e botão de centralizar)
   const irPara = (iso) => {
     const c = centro[iso];

@@ -824,3 +824,8 @@ table.kv th { white-space: normal; line-height: 17px; }
 /* Toque com cara de app: sem o flash azul do navegador e sem selecionar texto do menu */
 html { -webkit-tap-highlight-color: transparent; }
 .lateral, .pilulas, .botao-fogo, .botao-vidro { -webkit-user-select: none; user-select: none; }
+
+/* Atributo hidden sempre esconde, mesmo em elementos com display próprio (ex.: .potencial-grade) */
+[hidden] { display: none !important; }
+/* No celular o globo ocupa a largura toda: deslizar na vertical rola a página; na horizontal, gira o globo */
+@media (max-width: 760px) { .globo { touch-action: pan-y; } }

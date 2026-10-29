@@ -21,9 +21,9 @@ self.addEventListener("fetch", (ev) => {
   if (ev.request.method !== "GET") return;
   // Dados: sempre tenta a rede primeiro; o cache só serve quando está offline.
   if (url.pathname.includes("/dados/")) {
+    // Só guarda resposta boa: um erro passageiro (404 durante a publicação) não apaga a cópia para uso offline.
     ev.respondWith(fetch(ev.request).then((resp) => {
-      const copia = resp.clone();
-      caches.open(VERSAO).then((c) => c.put(ev.request, copia));
+      if (resp.ok) { const copia = resp.clone(); ev.waitUntil(caches.open(VERSAO).then((c) => c.put(ev.request, copia))); }
       return resp;
     }).catch(() => caches.match(ev.request)));
     return;
@@ -32,7 +32,7 @@ self.addEventListener("fetch", (ev) => {
   // Arquivos do próprio app: "no-cache" confere com o servidor (o GitHub deixa o navegador guardar por 10 min).
   const daRede = url.origin === self.location.origin ? fetch(ev.request.url, { cache: "no-cache", credentials: "same-origin" }) : fetch(ev.request);
   ev.respondWith(daRede.then((resp) => {
-    if (resp.ok) { const copia = resp.clone(); caches.open(VERSAO).then((c) => c.put(ev.request, copia)); }
+    if (resp.ok) { const copia = resp.clone(); ev.waitUntil(caches.open(VERSAO).then((c) => c.put(ev.request, copia))); }
     return resp;
   }).catch(() => caches.match(ev.request, { ignoreSearch: true })));
 });
@@ -49,7 +49,7 @@ self.addEventListener("notificationclick", (ev) => {
   ev.notification.close();
   const destino = new URL(ev.notification.data?.url || "./", self.registration.scope).href;
   ev.waitUntil(self.clients.matchAll({ type: "window" }).then((janelas) => {
-    for (const j of janelas) if (j.url.startsWith(self.registration.scope)) return j.navigate(destino).then((w) => w.focus());
+    for (const j of janelas) if (j.url.startsWith(self.registration.scope)) return j.navigate(destino).then((w) => w?.focus());
     return self.clients.openWindow(destino);
   }));
 });

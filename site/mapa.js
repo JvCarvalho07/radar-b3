@@ -1,10 +1,14 @@
 // Mapa do mercado (estilo Finviz): cada quadrado é uma ação, agrupada por setor.
 // Tamanho = volume negociado por dia (raiz quadrada, para as gigantes não engolirem o resto); cor = variação do dia.
 const D3_MAPA = "https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js";
-let slotMapa = null, tempoMapa = null;
+let slotMapa = null, tempoMapa = null, larguraMapa = 0;
+// No celular, a barra de endereço some ao rolar e dispara "resize" sem mudar a largura: aí não redesenha.
 window.addEventListener("resize", () => {
   clearTimeout(tempoMapa);
-  tempoMapa = setTimeout(() => { if (slotMapa?.isConnected) desenharMapa(slotMapa); }, 250);
+  tempoMapa = setTimeout(() => {
+    const caixa = slotMapa?.isConnected && $("#mapa-caixa", slotMapa);
+    if (caixa && caixa.clientWidth !== larguraMapa) desenharMapa(slotMapa);
+  }, 250);
 });
 
 const corVariacao = (v) => {
@@ -37,9 +41,10 @@ function desenharMapa(slot) {
     const setor = SETORES[u.setor] || u.setor || "Outros";
     (porSetor[setor] ||= []).push({ nome: p, valor: Math.sqrt(u.liq_2meses), u });
   }
+  if (!Object.keys(porSetor).length) { caixa.innerHTML = '<div class="vazio">Sem variação do dia para montar o mapa agora.</div>'; return; }
   const raiz = d3.hierarchy({ children: Object.entries(porSetor).map(([nome, children]) => ({ nome, children })) })
     .sum((d) => d.valor || 0).sort((a, b) => b.value - a.value);
-  const W = caixa.clientWidth, H = W > 900 ? 480 : W > 600 ? 520 : 620;
+  const W = (larguraMapa = caixa.clientWidth), H = W > 900 ? 480 : W > 600 ? 520 : 620;
   d3.treemap().size([W, H]).paddingTop(20).paddingInner(2).paddingOuter(2).round(true)(raiz);
   caixa.style.height = `${H}px`;
 

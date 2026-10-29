@@ -15,8 +15,8 @@
   <link rel="apple-touch-icon" href="icones/icone-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" crossorigin="anonymous">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
@@ -62,7 +62,7 @@
   </aside>
 
   <div class="paleta" id="paleta" hidden>
-    <div class="paleta-caixa" role="dialog" aria-label="Buscar ação">
+    <div class="paleta-caixa" role="dialog" aria-modal="true" aria-label="Buscar ação">
       <div class="paleta-campo"><i class="ti ti-search"></i>
         <input id="paleta-input" placeholder="Código ou nome da empresa" autocomplete="off" spellcheck="false" aria-label="Código ou nome da empresa">
         <kbd>Esc</kbd></div>
@@ -70,7 +70,7 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js" crossorigin="anonymous"></script>
   <script src="config.js"></script>
   <script src="rede.js"></script>
   <script src="globo.js"></script>
