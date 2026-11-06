@@ -85,6 +85,7 @@
    "PNVL3",
    "POMO3",
    "POMO4",
+   "RECV3",
    "RENT3",
    "RENT4",
    "RIAA3",
@@ -158,6 +159,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-11-05T17:57:47-03:00"
+  "em": "2026-11-05T22:03:00-03:00"
  }
 }
