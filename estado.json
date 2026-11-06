@@ -26,6 +26,7 @@
    "PINE4",
    "PLPL3",
    "PSSA3",
+   "RECV3",
    "RENT3",
    "SANB11",
    "SANB3",
@@ -52,11 +53,10 @@
    "BBDC3",
    "BBDC4",
    "BLAU3",
-   "BMOB3",
+   "BMEB4",
    "BRBI11",
    "BRSR6",
    "CEAB3",
-   "CMIN3",
    "CSED3",
    "CURY3",
    "CYRE3",
@@ -64,8 +64,7 @@
    "DIRR3",
    "EGIE3",
    "EVEN3",
-   "EZTC3",
-   "FIQE3",
+   "FLRY3",
    "GGPS3",
    "GMAT3",
    "GRND3",
@@ -78,14 +77,12 @@
    "LREN3",
    "MDNE3",
    "MELK3",
-   "MOTV3",
    "MULT3",
    "PINE4",
    "PLPL3",
    "PNVL3",
    "POMO3",
    "POMO4",
-   "RECV3",
    "RENT3",
    "RENT4",
    "RIAA3",
@@ -97,7 +94,6 @@
    "SMFT3",
    "TEND3",
    "TFCO4",
-   "TGMA3",
    "TOTS3",
    "TRIS3",
    "TTEN3",
@@ -154,11 +150,16 @@
    "acima": false
   }
  },
+ "sem_preco": {
+  "caiu_demais": {
+   "TTEN3": "2026-11-06T16:50:06-03:00"
+  }
+ },
  "push": {
   "configurado": false,
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-11-05T22:03:00-03:00"
+  "em": "2026-11-06T16:50:06-03:00"
  }
 }
