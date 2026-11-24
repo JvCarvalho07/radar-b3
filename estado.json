@@ -38,9 +38,11 @@
    "WIZC3"
   ],
   "caiu_demais": [
+   "ALPA4",
    "ASAI3",
    "AURA33",
    "AXIA3",
+   "AXIA7",
    "B3SA3",
    "BBDC3",
    "BBDC4",
@@ -64,6 +66,7 @@
    "LREN3",
    "MDNE3",
    "MULT3",
+   "PETR4",
    "PINE4",
    "PLPL3",
    "PNVL3",
@@ -75,6 +78,7 @@
    "RENT4",
    "RIAA3",
    "SEER3",
+   "SHUL4",
    "SMFT3",
    "TEND3",
    "TFCO4",
@@ -140,6 +144,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-11-20T17:54:00-03:00"
+  "em": "2026-11-23T21:33:22-03:00"
  }
 }
