@@ -27,6 +27,60 @@ GitHub Actions (a cada ~5 min no pregão, 10h–18h de Brasília)
 Tudo roda de graça: GitHub Actions é ilimitado em repositório público, e o GitHub Pages hospeda o app.
 Quando sai versão nova do código, o app (inclusive o instalado no celular) se atualiza sozinho.
 
+Para as rodadas começarem todo dia, configure o [disparo externo](#disparo-externo).
+
+## Disparo externo
+
+As rodadas se encadeiam sozinhas só até 18h05. Para religar no dia seguinte, não dá para contar com o
+agendamento do GitHub: em nov/2026 ele disparava só de 1 a 4 vezes por dia útil, quase sempre fora do
+pregão a partir de 16/11. A solução é um serviço de fora, o [cron-job.org](https://cron-job.org)
+(gratuito), chamar o workflow. Configura-se uma vez; o token precisa ser renovado todo ano.
+
+**1. Crie o token.** [Este link](https://github.com/settings/personal-access-tokens/new?name=Radar+B3+disparo&description=Dispara+o+radar.yml+nos+dias+%C3%BAteis&expires_in=366&actions=write)
+abre o formulário do GitHub pedindo validade de 366 dias e a permissão **Actions** com escrita.
+
+- Em **Repository access**, escolha **Only select repositories** e marque **só o radar-b3**. O link não
+  preenche essa parte.
+- Em **Permissions**, confira: **Actions** com *Read and write* e nenhuma outra permissão além da
+  *Metadata* (leitura), que o GitHub inclui sozinho.
+- Gere e copie o token. Cole **somente** no cron-job.org: nunca em chat, arquivo ou no repositório.
+
+Se esse token vazar, dá para disparar, cancelar e apagar execuções ou desligar workflows deste
+repositório, mas não alterar o código.
+
+**2. Crie um cronjob** no cron-job.org com estes dados (os nomes dos campos na tela podem variar):
+
+| O quê | Valor |
+|---|---|
+| URL | `https://api.github.com/repos/JvCarvalho07/radar-b3/actions/workflows/radar.yml/dispatches` |
+| Método | `POST` |
+| Corpo | `{"ref":"main"}` |
+| Fuso horário | `America/Sao_Paulo` |
+| Quando | segunda a sexta, às 10h, 11h, 13h, 15h e 17h (minuto 0) |
+| Aviso | e-mail quando falhar |
+
+Cabeçalhos (troque `SEU_TOKEN`, mantendo a palavra `Bearer`):
+
+```
+Authorization: Bearer SEU_TOKEN
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2026-03-10
+Content-Type: application/json
+```
+
+**3. Teste.** Faça uma execução de teste no cron-job.org (ou espere o próximo horário). Deu certo se a
+resposta for 200 ou 204 **e** aparecer uma execução nova em *Actions* → *Radar B3*. Se der errado:
+
+- **401:** o token foi colado errado ou venceu.
+- **403 ou 404:** confira se o token tem acesso ao radar-b3 e *Actions* com escrita.
+- **403 citando `User-Agent`:** o GitHub exige esse cabeçalho e o cron-job.org não deixa configurá-lo.
+  Nesse caso, troque pelo Agendador de Tarefas do Windows, rodando
+  `gh workflow run radar.yml -R JvCarvalho07/radar-b3` (o PC precisa estar ligado).
+
+A chamada das 10h inicia as rodadas; as outras religam se a sequência quebrar. Quando ela está
+funcionando, o disparo extra não cria uma segunda sequência: o GitHub mantém uma rodada em andamento e
+uma na fila. Por isso podem aparecer algumas execuções canceladas na lista, o que é esperado.
+
 ## Instalar no celular
 
 1. Abra o link do app no navegador do celular.
@@ -87,8 +141,8 @@ Depois abra http://localhost:8000. Localmente, o estado fica em `dados/` e o cac
 
 - **Atraso de ~15 min nos preços:** dados da B3 em tempo real são licenciados e pagos.
   As fontes gratuitas (Yahoo Finance) têm esse atraso.
-- **Horários do GitHub Actions:** o agendamento é "melhor esforço" e às vezes atrasa alguns
-  minutos ou pula uma execução em horário de pico.
+- **Horários do GitHub Actions:** o agendamento é "melhor esforço": pode atrasar horas e pular a
+  maioria das execuções. Por isso existe o [disparo externo](#disparo-externo).
 - **60 dias sem atividade:** em repositório público, o GitHub pode desativar agendamentos
   depois de 60 dias sem atividade no repositório. Ele avisa por e-mail; é só entrar em
   *Actions* e clicar em *Enable workflow*.
