@@ -172,6 +172,11 @@ th.ord:hover, th.ord.on { color: var(--texto); }
 .kv td:first-child { color: var(--muted); }
 .kv tbody tr { cursor: default; }
 .kv tbody tr:hover td { background: none; }
+/* A biblioteca de gráficos usa <table> por dentro: o estilo das tabelas do app não pode atingi-la
+   (a faixa dos meses crescia e ficava cortada). */
+.tv-lightweight-charts table { border-spacing: 0; }
+.tv-lightweight-charts tr { cursor: default; }
+.tv-lightweight-charts tr td, .tv-lightweight-charts tr:hover td { height: auto; padding: 0; background: none; border-radius: 0; }
 
 .logo { position: relative; flex: none; width: 40px; height: 40px; border-radius: 13px; overflow: hidden; display: grid; place-items: center; background: rgba(255, 255, 255, .08); color: var(--muted); font: 700 12px var(--font); }
 .logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #fff; }

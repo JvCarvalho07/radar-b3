@@ -388,7 +388,7 @@ function telaInicio() {
         </section>
         <section class="painel" style="flex:1">
           <div class="painel-cabeca"><h2>Pede sua atenção</h2><a class="ver-todos" href="#alertas">Alertas<i class="ti ti-chevron-right"></i></a></div>
-          ${atencao.map((a) => `<a class="mudanca" href="#acao/${esc(a.p)}">${logo(a.p)}<div style="min-width:0"><b>${esc(a.p)} · ${esc(a.t)}</b><p>${esc(a.d)}</p></div><span class="quando"><span class="${a.tipo}" style="font-weight:800;font-size:16px">${a.tipo === "neg" ? "↓" : a.tipo === "pos" ? "↑" : "•"}</span></span></a>`).join("")
+          ${atencao.map((a) => `<a class="mudanca" href="#acao/${esc(a.p)}">${logo(a.p)}<div style="min-width:0"><b>${esc(a.t.startsWith(`${a.p} `) ? a.t : `${a.p} · ${a.t}`)}</b><p>${esc(a.d)}</p></div><span class="quando"><span class="${a.tipo}" style="font-weight:800;font-size:16px">${a.tipo === "neg" ? "↓" : a.tipo === "pos" ? "↑" : "•"}</span></span></a>`).join("")
             || '<div class="vazio">Nada pedindo atenção agora: nenhum alerta disparou e nada entrou ou saiu das estratégias.</div>'}
         </section>
       </div>

@@ -290,3 +290,11 @@ node testes/carteira.test.js
   separado, carregado só pela carteira: o arquivo principal cairia de ~97 KB para ~69 KB comprimidos.
   Mexe nas contas da carteira, então pede cuidado e testes.
 - Fazer o agendamento de reserva também pular os feriados (hoje só o encadeamento pula).
+
+---
+
+## 11. Correções de tela (27/11/2026)
+
+- Gráficos: o estilo das tabelas do app atingia a tabela interna da biblioteca de gráficos, e os meses
+  apareciam cortados. A regra `.tv-lightweight-charts` no `estilo.css` isola os gráficos.
+- "Pede sua atenção": o código da ação não aparece mais repetido nos avisos de entrada e saída.
