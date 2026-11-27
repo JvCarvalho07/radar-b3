@@ -39,7 +39,14 @@ GitHub Actions (a cada ~5 min no pregão, 10:00–18:05 de Brasília, seg–sex)
 - **Tudo é de graça:** Actions é ilimitado em repositório público; o Pages hospeda o app.
 - **Rodadas encadeadas:** o agendamento do GitHub atrasa e pula execuções. Por isso, no fim de cada
   rodada durante o pregão, o próprio workflow espera 150 s e dispara a próxima (`gh workflow run`).
-  O `concurrency: radar` garante uma rodada por vez; o cron fica de reserva para religar a cadeia.
+  O `concurrency: radar` garante uma rodada por vez.
+- **Quem religa a cadeia:** ela para às 18h05. O cron do GitHub sozinho não basta: em dias úteis ele
+  disparou só de 1 a 4 vezes por dia (o `radar.yml` prevê 97), e não houve nenhuma rodada no pregão em
+  16, 17, 19 e de 23 a 27/11/2026. Por isso há um **disparo externo** (cron-job.org →
+  `workflow_dispatch`, seg–sex às 10h, 11h, 13h, 15h e 17h; passos no README). Se a cadeia está viva,
+  o disparo extra não a duplica: o `concurrency` mantém uma rodada em andamento e uma na fila, e quando
+  chega outra, a que estava na fila é cancelada. O cron fica só de reserva. Uma correção que dependa de
+  o cron do GitHub cair dentro do pregão não resolve.
 - **Cache:** fundamentos, histórico de 1 ano, eventos (proventos e desdobramentos) e perfis são
   baixados uma vez por dia e reaproveitados. A chave do cache inclui o `run_id`, então ele é salvo em
   toda rodada.
@@ -212,11 +219,16 @@ Testes automáticos: veja a seção "Testes" no fim deste relatório (atualizada
 | `586a2cf` | Carteira com gráficos (patrimônio, rosca, mini gráficos), app instalável, ajustes no celular |
 | `0a55218` | Rótulo do menu não fica preso no toque; versão carimbada automaticamente no `sw.js` |
 | `4ab1f3a` | Bancos podem entrar em Qualidade (zeros do Fundamentus viram "sem dado") |
+| 27/11/2026 | O robô quase não rodava no pregão porque dependia do cron do GitHub para religar. Documentado o disparo externo no README; nenhum código mudou |
 
 ---
 
 ## 9. Pendências do lado do dono
 
+- **Disparo externo ainda não configurado** (token do GitHub e cron-job.org): passos no `README.md`,
+  seção "Disparo externo". Sem ele, o robô pode passar o pregão inteiro sem rodar. Depois de
+  configurar e testar, troque este item pela data em que o token vence (ele vale 366 dias). Nunca anote
+  o token.
 - **Notificações push ainda não estão ligadas:** os secrets `VAPID_PRIVATE_KEY` e `PUSH_SUBSCRIPTIONS`
   não existem no repositório. Passos no `README.md` (seção "Instalar no celular").
 - Abas antigas abertas antes da atualização automática precisam de um F5 uma única vez.
