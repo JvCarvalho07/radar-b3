@@ -5,7 +5,6 @@
    "BBDC3",
    "BBDC4",
    "BMGB4",
-   "CEAB3",
    "CLSC4",
    "CMIG4",
    "CYRE3",
@@ -32,19 +31,23 @@
    "TEND3",
    "UGPA3",
    "VLID3",
-   "VULC3",
    "WIZC3"
   ],
   "caiu_demais": [
    "AURA33",
+   "BBDC3",
    "BBDC4",
    "BRBI11",
+   "BRSR6",
    "CEAB3",
+   "CURY3",
    "CYRE3",
    "CYRE4",
    "DIRR3",
    "EGIE3",
    "GGPS3",
+   "GRND3",
+   "KEPL3",
    "LAVV3",
    "LIGT3",
    "LOGG3",
@@ -120,6 +123,6 @@
   "inscricoes": 0,
   "enviadas": 0,
   "expiradas": 0,
-  "em": "2026-11-27T18:47:24-03:00"
+  "em": "2026-11-28T00:17:41-03:00"
  }
 }
